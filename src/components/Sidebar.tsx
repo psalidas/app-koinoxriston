@@ -1,10 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { NAV_ITEMS } from './nav'
+import { navFor } from './nav'
 import { useAuth } from '@/lib/auth'
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { isManager } = useAuth()
-  const items = NAV_ITEMS.filter((i) => !i.managerOnly || isManager)
+  const items = navFor(isManager)
 
   let lastSection: string | undefined
 

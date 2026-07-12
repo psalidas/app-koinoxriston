@@ -18,22 +18,25 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function email() {
-      return request.auth.token.email;
+    // Membership identifier: email when present, else the phone number.
+    function uid() {
+      return request.auth.token.email != null
+        ? request.auth.token.email
+        : request.auth.token.phone_number;
     }
 
     function isBootstrapAdmin() {
-      return isAuthed() && email() == 'michael@crowdpolicy.com';
+      return isAuthed() && request.auth.token.email == 'michael@crowdpolicy.com';
     }
 
     function userDoc() {
-      return get(/databases/$(database)/documents/users/$(email())).data;
+      return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
     function isKnownUser() {
       return isAuthed() && (
         isBootstrapAdmin()
-        || exists(/databases/$(database)/documents/users/$(email()))
+        || exists(/databases/$(database)/documents/users/$(uid()))
       );
     }
 
@@ -41,7 +44,7 @@ service cloud.firestore {
       return isAuthed() && (
         isBootstrapAdmin()
         || (
-          exists(/databases/$(database)/documents/users/$(email()))
+          exists(/databases/$(database)/documents/users/$(uid()))
           && userDoc().role in ['admin', 'manager']
         )
       );
@@ -51,8 +54,8 @@ service cloud.firestore {
     match /{document=**} { allow read, write: if false; }
 
     // /users — managers manage; a user can read their own doc.
-    match /users/{userEmail} {
-      allow read: if isManager() || (isAuthed() && email() == userEmail);
+    match /users/{userId} {
+      allow read: if isManager() || (isAuthed() && uid() == userId);
       allow create, update, delete: if isManager();
     }
 
@@ -96,6 +99,25 @@ service cloud.firestore {
     match /announcements/{id} {
       allow read: if isKnownUser();
       allow write: if isManager();
+    }
+
+    // Tickets (βλάβες) — known users read & create; managers update/delete.
+    match /tickets/{id} {
+      allow read: if isKnownUser();
+      allow create: if isKnownUser();
+      allow update, delete: if isManager();
+    }
+
+    // Contracts (συμβόλαια) — known users read, managers write.
+    match /contracts/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
+    // Mail queue for the firestore-send-email extension — written only from
+    // trusted Cloud Functions (admin SDK bypasses rules). Deny all clients.
+    match /mail/{id} {
+      allow read, write: if false;
     }
 
     // Audit log — managers read; writes happen from trusted context only.

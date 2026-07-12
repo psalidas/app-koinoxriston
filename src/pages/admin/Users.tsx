@@ -16,10 +16,11 @@ const emptyForm = () => ({
   role: 'owner' as Role,
   phone: '',
   active: true,
+  apartmentIds: [] as string[],
 })
 
 export default function Users() {
-  const { building } = useAppData()
+  const { building, apartments } = useAppData()
   const { user, profile } = useAuth()
   const [users, setUsers] = useState<UserDoc[]>([])
   const [modalOpen, setModalOpen] = useState(false)
@@ -43,8 +44,24 @@ export default function Users() {
 
   function openEdit(u: UserDoc) {
     setEditing(u)
-    setForm({ email: u.email, name: u.name, role: u.role, phone: u.phone ?? '', active: u.active !== false })
+    setForm({
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      phone: u.phone ?? '',
+      active: u.active !== false,
+      apartmentIds: u.apartmentIds ?? [],
+    })
     setModalOpen(true)
+  }
+
+  function toggleApartment(id: string) {
+    setForm((f) => ({
+      ...f,
+      apartmentIds: f.apartmentIds.includes(id)
+        ? f.apartmentIds.filter((x) => x !== id)
+        : [...f.apartmentIds, id],
+    }))
   }
 
   async function save() {
@@ -56,7 +73,7 @@ export default function Users() {
       phone: form.phone.trim() || undefined,
       active: form.active,
       buildingIds: building ? [building.id] : [],
-      apartmentIds: editing?.apartmentIds ?? [],
+      apartmentIds: form.apartmentIds,
     })
     await logAudit({
       buildingId: building?.id,
@@ -157,9 +174,11 @@ export default function Users() {
         }
       >
         <div className="space-y-3">
-          <Field label="Email" hint="Το email με το οποίο θα συνδέεται ο χρήστης.">
+          <Field
+            label="Email ή κινητό"
+            hint="Το αναγνωριστικό εισόδου: email (για Google/email-link) ή κινητό σε διεθνή μορφή (π.χ. +306941234567) για SMS OTP."
+          >
             <TextField
-              type="email"
               value={form.email}
               disabled={!!editing}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -193,6 +212,24 @@ export default function Users() {
             />
             Ενεργός λογαριασμός
           </label>
+
+          {(form.role === 'owner' || form.role === 'resident') && (
+            <div>
+              <div className="mb-1 text-sm font-medium text-gray-700">Διαμερίσματα</div>
+              <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-3">
+                {apartments.map((a) => (
+                  <label key={a.id} className="flex items-center gap-1.5 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.apartmentIds.includes(a.id)}
+                      onChange={() => toggleApartment(a.id)}
+                    />
+                    {a.code}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

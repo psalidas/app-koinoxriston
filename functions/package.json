@@ -1,0 +1,23 @@
+{
+  "name": "app-koinoxriston-functions",
+  "description": "Cloud Functions για ειδοποιήσεις (email) της εφαρμογής πολυκατοικίας",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "typecheck": "tsc --noEmit",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}

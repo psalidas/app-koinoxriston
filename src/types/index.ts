@@ -225,6 +225,72 @@ export interface Statement {
   createdAt?: Timestamp
 }
 
+// ── Announcements ────────────────────────────────────────────────────────────
+
+export interface Announcement {
+  id: string
+  buildingId: string
+  title: string
+  body: string
+  pinned?: boolean
+  authorName: string
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
+// ── Tickets (βλάβες / αιτήματα) ────────────────────────────────────────────────
+
+export type TicketStatus = 'open' | 'in_progress' | 'done'
+
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  open: 'Ανοιχτό',
+  in_progress: 'Σε εξέλιξη',
+  done: 'Ολοκληρωμένο',
+}
+
+export const TICKET_CATEGORIES = [
+  'Ανελκυστήρας',
+  'Ηλεκτρολογικά',
+  'Υδραυλικά',
+  'Καθαριότητα',
+  'Θέρμανση',
+  'Κοινόχρηστοι χώροι',
+  'Άλλο',
+] as const
+
+export interface Ticket {
+  id: string
+  buildingId: string
+  apartmentId?: string
+  apartmentCode?: string
+  title: string
+  description: string
+  category: string
+  status: TicketStatus
+  photoUrl?: string
+  photoPath?: string
+  createdBy?: string
+  createdByName?: string
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
+// ── Contracts (συμβόλαια / συντηρήσεις) ─────────────────────────────────────────
+
+export interface Contract {
+  id: string
+  buildingId: string
+  title: string
+  vendor?: string
+  category: string
+  startDate?: Timestamp
+  endDate?: Timestamp
+  amount?: number
+  reminderDays?: number
+  note?: string
+  createdAt?: Timestamp
+}
+
 // ── Audit log ──────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

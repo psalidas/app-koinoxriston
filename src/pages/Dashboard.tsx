@@ -9,8 +9,11 @@ import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
 import { listFundEntries, fundBalance } from '@/lib/repos/fund'
 import { listExpenses } from '@/lib/repos/expenses'
+import { listContracts, daysUntil } from '@/lib/repos/contracts'
 import { balancesByApartment } from '@/lib/balances'
 import { seedDemoBuilding } from '@/data/seed'
+import type { Contract } from '@/types'
+import { AlarmClock } from 'lucide-react'
 
 export default function Dashboard() {
   const { building, apartments, configured, loading, refresh } = useAppData()
@@ -18,21 +21,29 @@ export default function Dashboard() {
   const [owed, setOwed] = useState(0)
   const [fund, setFund] = useState(0)
   const [periodExpenses, setPeriodExpenses] = useState(0)
+  const [expiring, setExpiring] = useState<Contract[]>([])
   const [seeding, setSeeding] = useState(false)
 
   useEffect(() => {
     if (!building) return
     void (async () => {
-      const [statements, payments, fundEntries, expenses] = await Promise.all([
+      const [statements, payments, fundEntries, expenses, contracts] = await Promise.all([
         listStatements(building.id),
         listPayments(building.id),
         listFundEntries(building.id),
         listExpenses(building.id, currentPeriod()),
+        listContracts(building.id),
       ])
       const balances = balancesByApartment(statements, payments)
       setOwed(Object.values(balances).reduce((s, v) => s + (v > 0 ? v : 0), 0))
       setFund(fundBalance(fundEntries))
       setPeriodExpenses(expenses.reduce((s, e) => s + e.amount, 0))
+      setExpiring(
+        contracts.filter((c) => {
+          const d = daysUntil(c)
+          return d !== null && d <= (c.reminderDays ?? 30)
+        }),
+      )
     })()
   }, [building])
 
@@ -101,6 +112,29 @@ export default function Dashboard() {
           value={money(periodExpenses)}
         />
       </div>
+
+      {expiring.length > 0 && (
+        <Card className="mt-4 border-amber-200 bg-amber-50">
+          <div className="flex items-start gap-2">
+            <AlarmClock className="mt-0.5 shrink-0 text-amber-600" size={18} />
+            <div className="text-sm">
+              <div className="font-medium text-amber-800">Συμβόλαια που λήγουν σύντομα</div>
+              <ul className="mt-1 space-y-0.5 text-amber-700">
+                {expiring.map((c) => {
+                  const d = daysUntil(c) ?? 0
+                  return (
+                    <li key={c.id}>
+                      <Link to="/contracts" className="hover:underline">
+                        {c.title} — {d < 0 ? 'έληξε' : `σε ${d} ημέρες`}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <QuickLink to="/expenses" title="Καταχώρηση δαπανών" desc="Έξοδα του μήνα ανά κατηγορία" />

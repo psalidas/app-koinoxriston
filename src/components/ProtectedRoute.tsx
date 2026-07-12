@@ -34,7 +34,7 @@ export function ProtectedRoute({
   }
 
   if (managerOnly && !isManager) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/portal" replace />
   }
 
   return <>{children}</>

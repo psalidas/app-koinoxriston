@@ -13,6 +13,9 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
   type User,
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -35,16 +38,18 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   signInWithGoogle: () => Promise<void>
   sendEmailLink: (email: string) => Promise<void>
+  sendPhoneOtp: (phone: string, containerId: string) => Promise<ConfirmationResult>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function loadProfile(email: string | null): Promise<UserDoc | null> {
-  if (!email || !db) return null
-  const snap = await getDoc(doc(db, 'users', email))
+/** The membership doc id: email when present, else the phone number. */
+async function loadProfile(identifier: string | null): Promise<UserDoc | null> {
+  if (!identifier || !db) return null
+  const snap = await getDoc(doc(db, 'users', identifier))
   if (!snap.exists()) return null
-  return { email, ...(snap.data() as Omit<UserDoc, 'email'>) }
+  return { email: identifier, ...(snap.data() as Omit<UserDoc, 'email'>) }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -92,9 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         return
       }
-      const email = user.email
-      const profile = await loadProfile(email)
-      const isBootstrap = email === BOOTSTRAP_ADMIN
+      const identifier = user.email ?? user.phoneNumber
+      const profile = await loadProfile(identifier)
+      const isBootstrap = user.email === BOOTSTRAP_ADMIN
       const role: Role | null = profile?.role ?? (isBootstrap ? 'admin' : null)
       const hasAccess = isBootstrap || (!!profile && profile.active !== false)
       const isManager =
@@ -120,6 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(EMAIL_LINK_KEY, email)
   }
 
+  async function sendPhoneOtp(phone: string, containerId: string) {
+    if (!auth) throw new Error('Firebase δεν έχει ρυθμιστεί')
+    const verifier = new RecaptchaVerifier(auth, containerId, { size: 'invisible' })
+    return signInWithPhoneNumber(auth, phone, verifier)
+  }
+
   async function signOut() {
     if (!auth) return
     await fbSignOut(auth)
@@ -127,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, signInWithGoogle, sendEmailLink, signOut }}
+      value={{ ...state, signInWithGoogle, sendEmailLink, sendPhoneOtp, signOut }}
     >
       {children}
     </AuthContext.Provider>

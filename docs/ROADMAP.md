@@ -14,14 +14,14 @@
 - [x] Ανέβασμα παραστατικού (Storage) + πίνακας «Παραστατικά»
 - [x] Ατομικό ειδοποιητήριο με ΙΒΑΝ + κωδικό RF (ISO 11649) + EPC QR
 
-## Φάση 2 — Portal ενοίκων & ειδοποιήσεις
-- [ ] SMS OTP login (Firebase Phone Auth) — mobile-first
-- [ ] «Η καρτέλα μου» για ιδιοκτήτη/ένοικο (read-only)
-- [ ] Ατομικό ειδοποιητήριο ανά διαμέρισμα (PDF/print)
-- [ ] Ειδοποιήσεις email (Cloud Function + firestore-send-email)
-- [ ] PWA push notifications
-- [ ] Βλάβες/αιτήματα (tickets) με φωτό
-- [ ] Μητρώο συμβολαίων & υπενθυμίσεις λήξης (ασανσέρ, πυρασφάλεια…)
+## Φάση 2 — Portal ενοίκων & ειδοποιήσεις ✅
+- [x] SMS OTP login (Firebase Phone Auth) — mobile-first
+- [x] «Η καρτέλα μου» για ιδιοκτήτη/ένοικο (read-only) + role-based nav
+- [x] Ατομικό ειδοποιητήριο ανά διαμέρισμα (από τη Φάση 1)
+- [x] Ειδοποιήσεις email (Cloud Functions + firestore-send-email) — scaffold
+- [x] Βλάβες/αιτήματα (tickets) με φωτό
+- [x] Μητρώο συμβολαίων & υπενθυμίσεις λήξης (ασανσέρ, πυρασφάλεια…)
+- [ ] PWA push notifications — *επόμενο*
 
 ## Φάση 3 — Κοινότητα & πληρωμές
 - [ ] Συζήτηση + ανάρτηση προσφορών

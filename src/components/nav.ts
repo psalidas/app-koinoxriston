@@ -7,10 +7,14 @@ import {
   FileSpreadsheet,
   Wallet,
   PiggyBank,
+  Megaphone,
+  Wrench,
+  FileCheck,
   Upload,
   Users,
   History,
   Settings,
+  UserCircle,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -18,11 +22,10 @@ export interface NavItem {
   to: string
   label: string
   icon: LucideIcon
-  managerOnly?: boolean
   section?: string
 }
 
-export const NAV_ITEMS: NavItem[] = [
+const MANAGER_NAV: NavItem[] = [
   { to: '/', label: 'Πίνακας', icon: LayoutDashboard },
   { to: '/apartments', label: 'Διαμερίσματα', icon: Building2 },
   { to: '/millesimes', label: 'Πίνακας Χιλιοστών', icon: Grid3x3 },
@@ -31,8 +34,21 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/statements', label: 'Κοινόχρηστα', icon: FileSpreadsheet },
   { to: '/payments', label: 'Πληρωμές', icon: Wallet },
   { to: '/fund', label: 'Ταμείο', icon: PiggyBank },
-  { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, managerOnly: true },
-  { to: '/admin/users', label: 'Χρήστες', icon: Users, managerOnly: true, section: 'Διαχείριση' },
-  { to: '/admin/audit', label: 'Ιστορικό', icon: History, managerOnly: true, section: 'Διαχείριση' },
-  { to: '/admin/settings', label: 'Ρυθμίσεις κτιρίου', icon: Settings, managerOnly: true, section: 'Διαχείριση' },
+  { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
+  { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
+  { to: '/contracts', label: 'Συμβόλαια', icon: FileCheck },
+  { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
+  { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
+  { to: '/admin/audit', label: 'Ιστορικό', icon: History, section: 'Διαχείριση' },
+  { to: '/admin/settings', label: 'Ρυθμίσεις κτιρίου', icon: Settings, section: 'Διαχείριση' },
 ]
+
+const RESIDENT_NAV: NavItem[] = [
+  { to: '/portal', label: 'Η καρτέλα μου', icon: UserCircle },
+  { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
+  { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
+]
+
+export function navFor(isManager: boolean): NavItem[] {
+  return isManager ? MANAGER_NAV : RESIDENT_NAV
+}

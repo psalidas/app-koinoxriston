@@ -1,0 +1,108 @@
+rules_version = '2';
+
+// Διαχείριση Πολυκατοικίας — membership-based access.
+//
+// Unlike the domain-locked Crowdpolicy internal apps, residents/owners are
+// external users, so access is granted per-user via a /users/{email} document
+// created by a manager. A bootstrap admin is hardcoded so the very first
+// deploy can create the first /users docs.
+//
+// Roles: 'admin' | 'manager' | 'owner' | 'resident'
+//   - admin/manager  → full read/write on domain data
+//   - owner/resident → read data for their building(s); write only their own
+//                      participation (votes, tickets, topic comments) [Phase 2/3]
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function email() {
+      return request.auth.token.email;
+    }
+
+    function isBootstrapAdmin() {
+      return isAuthed() && email() == 'michael@crowdpolicy.com';
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(email())).data;
+    }
+
+    function isKnownUser() {
+      return isAuthed() && (
+        isBootstrapAdmin()
+        || exists(/databases/$(database)/documents/users/$(email()))
+      );
+    }
+
+    function isManager() {
+      return isAuthed() && (
+        isBootstrapAdmin()
+        || (
+          exists(/databases/$(database)/documents/users/$(email()))
+          && userDoc().role in ['admin', 'manager']
+        )
+      );
+    }
+
+    // Default deny.
+    match /{document=**} { allow read, write: if false; }
+
+    // /users — managers manage; a user can read their own doc.
+    match /users/{userEmail} {
+      allow read: if isManager() || (isAuthed() && email() == userEmail);
+      allow create, update, delete: if isManager();
+    }
+
+    // Building configuration & directory — known users read, managers write.
+    match /buildings/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /apartments/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /people/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
+    // Financials — known users read, managers write.
+    match /expenses/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /payments/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /statements/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /fundEntries/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
+    // Documents / announcements — known users read, managers write.
+    match /documents/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+    match /announcements/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
+    // Audit log — managers read; writes happen from trusted context only.
+    match /auditLogs/{id} {
+      allow read: if isManager();
+      allow create: if isManager();
+      allow update, delete: if false;
+    }
+  }
+}

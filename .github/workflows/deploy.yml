@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Firebase web config values are not secrets — they identify the project and
+# ship in the public client bundle. The only real secret is the service
+# account credential, which lives in GitHub Secrets.
+#
+# ⚠️ Fill these in after you create the Firebase project (see docs/SETUP.md §2).
+env:
+  VITE_FIREBASE_API_KEY: 'REPLACE_ME'
+  VITE_FIREBASE_AUTH_DOMAIN: 'app-koinoxriston.firebaseapp.com'
+  VITE_FIREBASE_PROJECT_ID: 'app-koinoxriston'
+  VITE_FIREBASE_STORAGE_BUCKET: 'app-koinoxriston.firebasestorage.app'
+  VITE_FIREBASE_MESSAGING_SENDER_ID: 'REPLACE_ME'
+  VITE_FIREBASE_APP_ID: 'REPLACE_ME'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Authenticate to Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: >
+          npx --yes firebase-tools@latest deploy
+          --only hosting,firestore:rules,firestore:indexes,storage
+          --project app-koinoxriston
+          --non-interactive

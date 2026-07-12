@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+/* Print: show only the statement, hide app chrome. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}
+
+/* Tabular figures for money/millesime columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

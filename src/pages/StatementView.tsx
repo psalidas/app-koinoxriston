@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, Download, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { Button, Badge } from '@/components/forms'
@@ -198,6 +198,23 @@ export default function StatementView() {
 
         <div className="mt-3 text-right text-[10px] text-gray-500">
           Γενικό σύνολο δαπανών: <span className="tnum font-bold text-gray-900">{amount(st.totals.grandTotal)} €</span>
+        </div>
+      </div>
+
+      {/* Individual notices */}
+      <div className="no-print mt-6">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Ατομικά ειδοποιητήρια</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {st.rows.map((r) => (
+            <Link
+              key={r.apartmentId}
+              to={`/statements/${st.id}/notice/${r.apartmentId}`}
+              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-blue-300"
+            >
+              <span className="font-medium text-gray-900">{r.code}</span>
+              <span className="tnum text-gray-500">{amount(r.total)}</span>
+            </Link>
+          ))}
         </div>
       </div>
     </div>

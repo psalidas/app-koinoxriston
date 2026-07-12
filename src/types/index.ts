@@ -135,6 +135,7 @@ export interface Expense {
   scaleKey?: string // when method === 'millesime'
   receiptUrl?: string
   receiptName?: string
+  receiptPath?: string
   note?: string
   createdAt?: Timestamp
   createdBy?: string

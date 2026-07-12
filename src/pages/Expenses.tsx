@@ -9,7 +9,9 @@ import { money, currentPeriod, formatPeriod } from '@/lib/format'
 import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
+import { uploadReceipt } from '@/lib/upload'
 import { logAudit } from '@/lib/audit'
+import { Paperclip } from 'lucide-react'
 
 type FormState = {
   group: ExpenseGroup
@@ -18,6 +20,9 @@ type FormState = {
   method: AllocationMethod
   scaleKey: string
   note: string
+  receiptUrl?: string
+  receiptName?: string
+  receiptPath?: string
 }
 
 export default function Expenses() {
@@ -30,6 +35,8 @@ export default function Expenses() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [toDelete, setToDelete] = useState<Expense | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState<FormState>({
     group: 'koinoxrista',
     category: '',
@@ -56,6 +63,7 @@ export default function Expenses() {
 
   function openNew() {
     setEditing(null)
+    setFile(null)
     setForm({
       group: 'koinoxrista',
       category: '',
@@ -69,6 +77,7 @@ export default function Expenses() {
 
   function openEdit(e: Expense) {
     setEditing(e)
+    setFile(null)
     setForm({
       group: e.group,
       category: e.category,
@@ -76,12 +85,31 @@ export default function Expenses() {
       method: e.method,
       scaleKey: e.scaleKey ?? scales[0]?.key ?? 'genika',
       note: e.note ?? '',
+      receiptUrl: e.receiptUrl,
+      receiptName: e.receiptName,
+      receiptPath: e.receiptPath,
     })
     setModalOpen(true)
   }
 
   async function save() {
     if (!building) return
+    setUploading(true)
+    let receipt = {
+      receiptUrl: form.receiptUrl,
+      receiptName: form.receiptName,
+      receiptPath: form.receiptPath,
+    }
+    try {
+      if (file) {
+        const up = await uploadReceipt(file, building.id)
+        receipt = { receiptUrl: up.url, receiptName: up.name, receiptPath: up.path }
+      }
+    } catch (err) {
+      alert('Σφάλμα ανεβάσματος: ' + (err as Error).message)
+      setUploading(false)
+      return
+    }
     const data = {
       buildingId: building.id,
       period,
@@ -91,9 +119,11 @@ export default function Expenses() {
       method: form.method,
       scaleKey: form.method === 'millesime' || form.method === 'heating' ? form.scaleKey : undefined,
       note: form.note.trim() || undefined,
+      ...receipt,
     }
     if (editing) await updateExpense(editing.id, data)
     else await createExpense(data)
+    setUploading(false)
     await logAudit({
       buildingId: building.id,
       userEmail: user?.email ?? '',
@@ -161,7 +191,22 @@ export default function Expenses() {
             )}
             {expenses.map((e) => (
               <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium text-gray-900">{e.category}</td>
+                <td className="px-3 py-2 font-medium text-gray-900">
+                  <span className="inline-flex items-center gap-1.5">
+                    {e.category}
+                    {e.receiptUrl && (
+                      <a
+                        href={e.receiptUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-gray-400 hover:text-blue-600"
+                        title="Παραστατικό"
+                      >
+                        <Paperclip size={14} />
+                      </a>
+                    )}
+                  </span>
+                </td>
                 <td className="px-3 py-2">
                   <Badge color="blue">{GROUP_LABELS[e.group]}</Badge>
                 </td>
@@ -211,7 +256,9 @@ export default function Expenses() {
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Ακύρωση
             </Button>
-            <Button onClick={save}>Αποθήκευση</Button>
+            <Button onClick={save} disabled={uploading}>
+              {uploading ? 'Αποθήκευση…' : 'Αποθήκευση'}
+            </Button>
           </>
         }
       >
@@ -272,6 +319,24 @@ export default function Expenses() {
           </div>
           <Field label="Σημείωση (προαιρετικό)">
             <TextField value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          </Field>
+          <Field label="Παραστατικό (εικόνα ή PDF)">
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+            />
+            {form.receiptUrl && !file && (
+              <a
+                href={form.receiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+              >
+                <Paperclip size={14} /> {form.receiptName ?? 'Τρέχον παραστατικό'}
+              </a>
+            )}
           </Field>
         </div>
       </Modal>

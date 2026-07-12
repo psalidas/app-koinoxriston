@@ -6,8 +6,10 @@ import Dashboard from './pages/Dashboard'
 import Apartments from './pages/Apartments'
 import Millesimes from './pages/Millesimes'
 import Expenses from './pages/Expenses'
+import Receipts from './pages/Receipts'
 import Statements from './pages/Statements'
 import StatementView from './pages/StatementView'
+import NoticeView from './pages/NoticeView'
 import Payments from './pages/Payments'
 import ApartmentLedger from './pages/ApartmentLedger'
 import Fund from './pages/Fund'
@@ -31,8 +33,10 @@ export default function App() {
         <Route path="/apartments" element={<Apartments />} />
         <Route path="/millesimes" element={<Millesimes />} />
         <Route path="/expenses" element={<Expenses />} />
+        <Route path="/receipts" element={<Receipts />} />
         <Route path="/statements" element={<Statements />} />
         <Route path="/statements/:id" element={<StatementView />} />
+        <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
         <Route path="/payments" element={<Payments />} />
         <Route path="/apartments/:id/ledger" element={<ApartmentLedger />} />
         <Route path="/fund" element={<Fund />} />

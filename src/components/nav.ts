@@ -8,6 +8,9 @@ import {
   Wallet,
   PiggyBank,
   Megaphone,
+  MessagesSquare,
+  Vote,
+  Gavel,
   Wrench,
   FileCheck,
   Upload,
@@ -35,6 +38,9 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/payments', label: 'Πληρωμές', icon: Wallet },
   { to: '/fund', label: 'Ταμείο', icon: PiggyBank },
   { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
+  { to: '/topics', label: 'Συζήτηση', icon: MessagesSquare },
+  { to: '/polls', label: 'Ψηφοφορίες', icon: Vote },
+  { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
   { to: '/contracts', label: 'Συμβόλαια', icon: FileCheck },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
@@ -46,6 +52,9 @@ const MANAGER_NAV: NavItem[] = [
 const RESIDENT_NAV: NavItem[] = [
   { to: '/portal', label: 'Η καρτέλα μου', icon: UserCircle },
   { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
+  { to: '/topics', label: 'Συζήτηση', icon: MessagesSquare },
+  { to: '/polls', label: 'Ψηφοφορίες', icon: Vote },
+  { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
 ]
 

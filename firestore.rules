@@ -120,6 +120,45 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Discussion — known users read & participate; managers moderate.
+    match /topics/{id} {
+      allow read: if isKnownUser();
+      allow create: if isKnownUser();
+      allow update, delete: if isManager();
+    }
+    match /comments/{id} {
+      allow read: if isKnownUser();
+      allow create: if isKnownUser();
+      allow update: if false;
+      allow delete: if isManager();
+    }
+    match /offers/{id} {
+      allow read: if isKnownUser();
+      allow create: if isKnownUser();
+      allow update: if false;
+      allow delete: if isManager();
+    }
+
+    // Polls — managers manage; everyone known reads.
+    match /polls/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
+    // Votes — a user writes only their own vote; managers (and the voter) read.
+    match /votes/{id} {
+      allow read: if isManager() || (isAuthed() && resource.data.voterId == uid());
+      allow create, update: if isKnownUser()
+        && request.resource.data.voterId == uid();
+      allow delete: if isManager();
+    }
+
+    // Assemblies (ΓΣ) — known users read, managers write.
+    match /assemblies/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
     // Audit log — managers read; writes happen from trusted context only.
     match /auditLogs/{id} {
       allow read: if isManager();

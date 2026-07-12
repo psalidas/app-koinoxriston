@@ -19,6 +19,12 @@ import Announcements from './pages/Announcements'
 import Tickets from './pages/Tickets'
 import Contracts from './pages/Contracts'
 import Portal from './pages/Portal'
+import Topics from './pages/Topics'
+import TopicView from './pages/TopicView'
+import Polls from './pages/Polls'
+import PollView from './pages/PollView'
+import Assemblies from './pages/Assemblies'
+import AssemblyView from './pages/AssemblyView'
 import Users from './pages/admin/Users'
 import AuditLog from './pages/admin/AuditLog'
 import BuildingSettings from './pages/admin/BuildingSettings'
@@ -38,6 +44,12 @@ export default function App() {
         <Route path="/portal" element={<Portal />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tickets" element={<Tickets />} />
+        <Route path="/topics" element={<Topics />} />
+        <Route path="/topics/:id" element={<TopicView />} />
+        <Route path="/polls" element={<Polls />} />
+        <Route path="/polls/:id" element={<PollView />} />
+        <Route path="/assemblies" element={<Assemblies />} />
+        <Route path="/assemblies/:id" element={<AssemblyView />} />
         <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
 
         {/* Manager-only */}

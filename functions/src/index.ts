@@ -53,6 +53,18 @@ export const onAnnouncementCreated = onDocumentCreated('announcements/{id}', asy
   await enqueueMail(to, `Ανακοίνωση: ${ann.title}`, html)
 })
 
+/** New poll → notify eligible users that a vote has opened. */
+export const onPollCreated = onDocumentCreated('polls/{id}', async (event) => {
+  const poll = event.data?.data()
+  if (!poll) return
+  const users = await buildingUsers(poll.buildingId as string)
+  const to = users.filter((u) => u.data.active !== false && isEmail(u.id)).map((u) => u.id)
+  const html =
+    `<h2>Νέα ψηφοφορία</h2><p>${escapeHtml(poll.question || '')}</p>` +
+    `<p>Ψηφίστε στην εφαρμογή.</p>`
+  await enqueueMail(to, `Ψηφοφορία: ${poll.question}`, html)
+})
+
 /** Statement issued (draft → issued) → email each owner/resident their amount. */
 export const onStatementIssued = onDocumentUpdated('statements/{id}', async (event) => {
   const before = event.data?.before.data()

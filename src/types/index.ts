@@ -291,6 +291,114 @@ export interface Contract {
   createdAt?: Timestamp
 }
 
+// ── Discussion (συζήτηση) ──────────────────────────────────────────────────────
+
+export interface Topic {
+  id: string
+  buildingId: string
+  title: string
+  body: string
+  authorName: string
+  createdBy?: string
+  pinned?: boolean
+  closed?: boolean
+  commentCount?: number
+  createdAt?: Timestamp
+}
+
+export interface Comment {
+  id: string
+  buildingId: string
+  topicId: string
+  body: string
+  authorName: string
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
+/** Ανάρτηση προσφοράς για εργασία (attached to a topic). */
+export interface Offer {
+  id: string
+  buildingId: string
+  topicId: string
+  vendor: string
+  amount?: number
+  description?: string
+  fileUrl?: string
+  filePath?: string
+  fileName?: string
+  authorName: string
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
+// ── Electronic voting (ψηφοφορίες) ─────────────────────────────────────────────
+
+export type PollEligibility = 'owners' | 'residents'
+export type PollWeightMode = 'millesime' | 'perApartment' | 'perUser'
+
+export const POLL_WEIGHT_LABELS: Record<PollWeightMode, string> = {
+  millesime: 'Κατά χιλιοστά',
+  perApartment: 'Μία ψήφος ανά διαμέρισμα',
+  perUser: 'Μία ψήφος ανά χρήστη',
+}
+
+export interface PollResults {
+  /** option index -> total weight */
+  byOption: Record<string, number>
+  votedWeight: number
+  votersCount: number
+}
+
+export interface Poll {
+  id: string
+  buildingId: string
+  question: string
+  description?: string
+  options: string[]
+  eligibility: PollEligibility
+  weightMode: PollWeightMode
+  scaleKey?: string // when weightMode === 'millesime'
+  deadline?: Timestamp
+  status: 'open' | 'closed'
+  /** total eligible weight (denominator for quorum/percentages) */
+  totalWeight: number
+  assemblyId?: string
+  results?: PollResults
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
+export interface Vote {
+  id: string // `${pollId}__${voterId}`
+  buildingId: string
+  pollId: string
+  voterId: string
+  voterName: string
+  option: number
+  weight: number
+  apartmentIds: string[]
+  createdAt?: Timestamp
+}
+
+// ── Assemblies (γενικές συνελεύσεις) ────────────────────────────────────────────
+
+export interface Assembly {
+  id: string
+  buildingId: string
+  title: string
+  scheduledAt?: Timestamp
+  status: 'planned' | 'held'
+  invitation?: string // πρόσκληση / ημερήσια διάταξη
+  minutes?: string // πρακτικά
+  decisions?: string // αποφάσεις
+  presentWeight?: number // παρόν βάρος χιλιοστών (για απαρτία)
+  totalWeight?: number
+  attachments?: { url: string; name: string; path: string }[]
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
 // ── Audit log ──────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

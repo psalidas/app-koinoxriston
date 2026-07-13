@@ -18,9 +18,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Membership identifier: email when present, else the phone number.
+    // Membership identifier. Οι magic-link συνεδρίες φέρουν custom claim
+    // `identifier` (= το id του /users doc) ώστε να ταυτοποιούνται αξιόπιστα
+    // email & κινητό. Αλλιώς email, αλλιώς αριθμός τηλεφώνου.
     function uid() {
-      return request.auth.token.email != null
+      return request.auth.token.identifier != null
+        ? request.auth.token.identifier
+        : request.auth.token.email != null
         ? request.auth.token.email
         : request.auth.token.phone_number;
     }

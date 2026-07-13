@@ -190,6 +190,26 @@ SMS.to.
 > μπορεί να ξαναδοκιμαστεί με «Επαναποστολή πρόσκλησης». Το κόστος SMS
 > χρεώνεται από το SMS.to.
 
+### 10.4 Magic-link login (email/κινητό)
+
+Η είσοδος γίνεται με **magic link**: ο χρήστης βάζει email ή κινητό → λαμβάνει
+σύνδεσμο (email μέσω Brevo / SMS μέσω sms.to) → πατά & μπαίνει. Η πρόσκληση νέου
+χρήστη περιέχει επίσης magic link (one-click). Υλοποίηση: callables
+`requestMagicLink` / `redeemMagicLink` (one-time token στο `magicTokens`,
+custom token → `signInWithCustomToken`). Δεν χρειάζεται Firebase Phone Auth.
+
+- Χρησιμοποιεί τα ίδια keys/config με τις προσκλήσεις (§10.3).
+- **Public invoker**: τα callables πρέπει να είναι δημόσια κλήσιμα. Αν το
+  `invoker: 'public'` δεν εφαρμοστεί αυτόματα (org policy), δώσε χειροκίνητα:
+  ```bash
+  gcloud run services add-iam-policy-binding requestmagiclink \
+    --region=europe-west1 --member=allUsers --role=roles/run.invoker --project=app-koinoxriston
+  gcloud run services add-iam-policy-binding redeemmagiclink \
+    --region=europe-west1 --member=allUsers --role=roles/run.invoker --project=app-koinoxriston
+  ```
+- (Προαιρετικό) Firestore **TTL policy** στο πεδίο `magicTokens.expiresAt` για
+  αυτόματο καθάρισμα ληγμένων tokens.
+
 ---
 
 ## Troubleshooting

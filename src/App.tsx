@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { ManagerOutlet } from './components/ManagerOutlet'
 import Login from './pages/Login'
+import MagicRedeem from './pages/MagicRedeem'
 import Dashboard from './pages/Dashboard'
 import Apartments from './pages/Apartments'
 import Millesimes from './pages/Millesimes'
@@ -35,6 +36,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/magic" element={<MagicRedeem />} />
       <Route
         element={
           <ProtectedRoute>

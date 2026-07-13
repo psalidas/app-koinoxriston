@@ -13,6 +13,9 @@ import { logger } from 'firebase-functions/v2'
 import { Timestamp } from 'firebase-admin/firestore'
 import { sendBrevoEmail } from './brevoClient'
 import { sendSmsTo } from './smsToClient'
+import { createMagicLink } from '../magic/links'
+
+const INVITE_TTL_MIN = 60 * 24 * 7 // ο σύνδεσμος πρόσκλησης ισχύει 7 ημέρες
 
 export const DEFAULT_APP_URL = 'https://app-koinoxriston.web.app'
 const DEFAULT_FROM_NAME = 'Διαχείριση Πολυκατοικίας'
@@ -69,7 +72,6 @@ export async function sendInvite(
   cfg: InviteConfig,
 ): Promise<'email' | 'sms'> {
   const name = typeof data.name === 'string' ? data.name : ''
-  const url = cfg.appUrl
   const mark = (channel: 'email' | 'sms') =>
     db.doc(`users/${userId}`).set({ invitedAt: Timestamp.now(), inviteChannel: channel }, { merge: true })
 
@@ -79,12 +81,13 @@ export async function sendInvite(
     if (!cfg.fromEmail) {
       throw new Error('Δεν έχει οριστεί «Email αποστολέα» στις Ρυθμίσεις προσκλήσεων.')
     }
+    const link = await createMagicLink(db, userId, cfg.appUrl, INVITE_TTL_MIN)
     const greeting = name ? `Γεια σας ${escapeHtml(name)},` : 'Γεια σας,'
     const html =
       `<p>${greeting}</p>` +
       `<p>Σας δόθηκε πρόσβαση στην εφαρμογή <b>Διαχείριση Πολυκατοικίας</b>.</p>` +
-      `<p>Μπείτε εδώ και συνδεθείτε με αυτό το email (Google ή σύνδεσμος εισόδου):</p>` +
-      `<p><a href="${url}">${url}</a></p>` +
+      `<p>Πατήστε τον παρακάτω σύνδεσμο για να μπείτε απευθείας (ισχύει 7 ημέρες):</p>` +
+      `<p><a href="${link}">Είσοδος στην εφαρμογή</a></p>` +
       `<p>—<br>Ο διαχειριστής της πολυκατοικίας</p>`
     await sendBrevoEmail(key, {
       toEmail: userId,
@@ -102,9 +105,8 @@ export async function sendInvite(
     const key = process.env.SMSTO_API_KEY
     if (!key) throw new Error('Λείπει το SMSTO_API_KEY (GitHub secret / functions env).')
     const to = userId.startsWith('+') ? userId : `+${userId.replace(/\s+/g, '')}`
-    const message =
-      `Σας δόθηκε πρόσβαση στη Διαχείριση Πολυκατοικίας. ` +
-      `Συνδεθείτε με το κινητό σας: ${url}`
+    const link = await createMagicLink(db, userId, cfg.appUrl, INVITE_TTL_MIN)
+    const message = `Πρόσκληση στη Διαχείριση Πολυκατοικίας. Είσοδος (7 ημέρες): ${link}`
     await sendSmsTo(key, { to, message, sender: cfg.smsSender })
     await mark('sms')
     logger.info('[invite] sms invite sent', { userId })

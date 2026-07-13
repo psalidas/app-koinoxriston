@@ -1,21 +1,14 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { LogIn, Mail, Smartphone } from 'lucide-react'
-import type { ConfirmationResult } from 'firebase/auth'
+import { LogIn, Send } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { isFirebaseConfigured } from '@/lib/firebase'
 import { Button, TextField } from '@/components/forms'
 
-type Mode = 'email' | 'phone'
-
 export default function Login() {
-  const { user, loading, signInWithGoogle, sendEmailLink, sendPhoneOtp } = useAuth()
-  const [mode, setMode] = useState<Mode>('email')
-  const [email, setEmail] = useState('')
+  const { user, loading, signInWithGoogle, sendMagicLink } = useAuth()
+  const [identifier, setIdentifier] = useState('')
   const [sent, setSent] = useState(false)
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -30,45 +23,15 @@ export default function Login() {
     }
   }
 
-  async function emailLink(ev: React.FormEvent) {
+  async function magic(ev: React.FormEvent) {
     ev.preventDefault()
     setError(null)
     setBusy(true)
     try {
-      await sendEmailLink(email.trim())
+      await sendMagicLink(identifier.trim())
       setSent(true)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function sendCode(ev: React.FormEvent) {
-    ev.preventDefault()
-    setError(null)
-    setBusy(true)
-    try {
-      let normalized = phone.trim().replace(/\s+/g, '')
-      if (!normalized.startsWith('+')) normalized = '+30' + normalized // default Greece
-      const result = await sendPhoneOtp(normalized, 'recaptcha-container')
-      setConfirmation(result)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function confirmCode(ev: React.FormEvent) {
-    ev.preventDefault()
-    if (!confirmation) return
-    setError(null)
-    setBusy(true)
-    try {
-      await confirmation.confirm(otp.trim())
-    } catch (e) {
-      setError('Λάθος κωδικός. ' + (e as Error).message)
     } finally {
       setBusy(false)
     }
@@ -100,86 +63,25 @@ export default function Login() {
           <div className="h-px flex-1 bg-gray-200" /> ή <div className="h-px flex-1 bg-gray-200" />
         </div>
 
-        {/* Method tabs */}
-        <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 text-sm">
-          <button
-            onClick={() => setMode('email')}
-            className={`flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium ${
-              mode === 'email' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            <Mail size={16} /> Email
-          </button>
-          <button
-            onClick={() => setMode('phone')}
-            className={`flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium ${
-              mode === 'phone' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            <Smartphone size={16} /> Κινητό
-          </button>
-        </div>
-
-        {mode === 'email' &&
-          (sent ? (
-            <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
-              Στείλαμε σύνδεσμο εισόδου στο <strong>{email}</strong>. Ανοίξτε το email σας από
-              αυτή τη συσκευή.
-            </div>
-          ) : (
-            <form onSubmit={emailLink} className="space-y-3">
-              <TextField
-                type="email"
-                required
-                placeholder="Το email σας"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={!isFirebaseConfigured}
-              />
-              <Button type="submit" disabled={!isFirebaseConfigured || busy} className="w-full">
-                <Mail size={18} /> Αποστολή συνδέσμου εισόδου
-              </Button>
-            </form>
-          ))}
-
-        {mode === 'phone' &&
-          (confirmation ? (
-            <form onSubmit={confirmCode} className="space-y-3">
-              <TextField
-                inputMode="numeric"
-                required
-                placeholder="Κωδικός SMS (6 ψηφία)"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-              />
-              <Button type="submit" disabled={busy} className="w-full">
-                Επιβεβαίωση κωδικού
-              </Button>
-              <button
-                type="button"
-                onClick={() => setConfirmation(null)}
-                className="w-full text-center text-xs text-gray-400 hover:text-gray-600"
-              >
-                Αλλαγή αριθμού
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={sendCode} className="space-y-3">
-              <TextField
-                type="tel"
-                required
-                placeholder="Κινητό (π.χ. 6941234567)"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={!isFirebaseConfigured}
-              />
-              <Button type="submit" disabled={!isFirebaseConfigured || busy} className="w-full">
-                <Smartphone size={18} /> Αποστολή κωδικού SMS
-              </Button>
-            </form>
-          ))}
-
-        <div id="recaptcha-container" />
+        {sent ? (
+          <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+            Αν το στοιχείο αντιστοιχεί σε λογαριασμό, στείλαμε <strong>σύνδεσμο εισόδου</strong> με
+            email ή SMS. Ανοίξτε τον για να μπείτε (ισχύει 1 ώρα).
+          </div>
+        ) : (
+          <form onSubmit={magic} className="space-y-3">
+            <TextField
+              required
+              placeholder="Email ή κινητό (π.χ. +30690…)"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              disabled={!isFirebaseConfigured}
+            />
+            <Button type="submit" disabled={!isFirebaseConfigured || busy} className="w-full">
+              <Send size={18} /> {busy ? 'Αποστολή…' : 'Αποστολή συνδέσμου εισόδου'}
+            </Button>
+          </form>
+        )}
 
         <p className="mt-4 text-center text-xs text-gray-400">
           Πρόσβαση μόνο με πρόσκληση από τον διαχειριστή.

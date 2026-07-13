@@ -17,6 +17,12 @@ export { onUserCreatedInvite } from './invites/onUserCreated'
 export { resendInvite } from './invites/resendInvite'
 export { sendTestInvite } from './invites/sendTest'
 
+// Magic-link login (email μέσω Brevo / κινητό μέσω sms.to) — ενιαίο για
+// πρόσκληση & κάθε login. requestMagicLink στέλνει σύνδεσμο, redeemMagicLink
+// τον εξαργυρώνει σε custom token (signInWithCustomToken στον client).
+export { requestMagicLink } from './magic/request'
+export { redeemMagicLink } from './magic/redeem'
+
 interface UserDoc {
   name?: string
   role?: string

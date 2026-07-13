@@ -6,9 +6,9 @@ function sanitize(name: string): string {
 }
 
 const MB = 1024 * 1024
-/** Όρια μεγέθους — πρέπει να συμφωνούν με τα storage.rules (100MB παντού). */
-export const RECEIPT_MAX_BYTES = 100 * MB
-export const DOCUMENT_MAX_BYTES = 100 * MB
+/** Όρια μεγέθους — πρέπει να συμφωνούν με τα storage.rules (250MB παντού). */
+export const RECEIPT_MAX_BYTES = 250 * MB
+export const DOCUMENT_MAX_BYTES = 250 * MB
 
 export interface UploadedFile {
   url: string

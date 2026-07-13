@@ -13,6 +13,7 @@ import {
   Gavel,
   Wrench,
   FileCheck,
+  FolderOpen,
   Upload,
   Users,
   History,
@@ -43,6 +44,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
   { to: '/contracts', label: 'Συμβόλαια', icon: FileCheck },
+  { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
   { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
   { to: '/admin/audit', label: 'Ιστορικό', icon: History, section: 'Διαχείριση' },
@@ -56,6 +58,7 @@ const RESIDENT_NAV: NavItem[] = [
   { to: '/polls', label: 'Ψηφοφορίες', icon: Vote },
   { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
+  { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
 ]
 
 export function navFor(isManager: boolean): NavItem[] {

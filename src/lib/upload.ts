@@ -25,6 +25,20 @@ export async function uploadReceipt(
   return { url, name: file.name, path }
 }
 
+/** Upload a building document under documents/{buildingId}/{ts}-{name}. */
+export async function uploadDocument(
+  file: File,
+  buildingId: string,
+): Promise<UploadedFile> {
+  if (!storage) throw new Error('Το Firebase Storage δεν έχει ρυθμιστεί.')
+  const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`
+  const path = `documents/${buildingId}/${stamp}-${sanitize(file.name)}`
+  const r = ref(storage, path)
+  await uploadBytes(r, file, { contentType: file.type })
+  const url = await getDownloadURL(r)
+  return { url, name: file.name, path }
+}
+
 export async function deleteFile(path: string): Promise<void> {
   if (!storage) return
   try {

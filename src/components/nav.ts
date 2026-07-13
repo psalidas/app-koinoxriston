@@ -14,6 +14,7 @@ import {
   Wrench,
   FileCheck,
   FolderOpen,
+  Contact,
   Upload,
   Users,
   History,
@@ -46,6 +47,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
   { to: '/contracts', label: 'Συμβόλαια', icon: FileCheck },
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
+  { to: '/directory', label: 'Κατάλογος', icon: Contact },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
   { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
   { to: '/admin/invites', label: 'Προσκλήσεις', icon: Send, section: 'Διαχείριση' },
@@ -61,6 +63,7 @@ const RESIDENT_NAV: NavItem[] = [
   { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
+  { to: '/directory', label: 'Κατάλογος', icon: Contact },
 ]
 
 export function navFor(isManager: boolean): NavItem[] {

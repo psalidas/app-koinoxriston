@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Pencil, Trash2, Paperclip, Upload } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Paperclip, Upload, MapPin } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, Field, TextField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { mille, formatDateTime } from '@/lib/format'
-import type { Assembly } from '@/types'
+import type { Apartment, Assembly, AssemblyAttachment, AssemblySection } from '@/types'
 import { getAssembly, updateAssembly, deleteAssembly } from '@/lib/repos/assemblies'
-import { uploadReceipt } from '@/lib/upload'
+import { uploadReceipt, deleteFile } from '@/lib/upload'
+
+const WEIGHT_SCALE = 'genika'
+const weightOf = (apt: Apartment) => apt.millesimes[WEIGHT_SCALE] ?? 0
 
 function toLocal(ts?: Timestamp): string {
   const ms = ts?.toMillis?.()
@@ -22,21 +25,30 @@ function toLocal(ts?: Timestamp): string {
 export default function AssemblyView() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { building } = useAppData()
+  const { building, apartments } = useAppData()
   const { isManager } = useAuth()
   const [a, setA] = useState<Assembly | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
   const [form, setForm] = useState({
     title: '',
+    location: '',
     scheduledAt: '',
     status: 'planned' as 'planned' | 'held',
     invitation: '',
     minutes: '',
     decisions: '',
-    presentWeight: 0,
+    presentApartmentIds: [] as string[],
   })
+
+  const sortedApartments = useMemo(
+    () => [...apartments].sort((x, y) => x.orderNo - y.orderNo),
+    [apartments],
+  )
+  const buildingWeight = useMemo(
+    () => apartments.reduce((s, apt) => s + weightOf(apt), 0),
+    [apartments],
+  )
 
   async function load() {
     if (!id) return
@@ -54,39 +66,59 @@ export default function AssemblyView() {
     if (!a) return
     setForm({
       title: a.title,
+      location: a.location ?? '',
       scheduledAt: toLocal(a.scheduledAt),
       status: a.status,
       invitation: a.invitation ?? '',
       minutes: a.minutes ?? '',
       decisions: a.decisions ?? '',
-      presentWeight: a.presentWeight ?? 0,
+      presentApartmentIds: a.presentApartmentIds ?? [],
     })
     setEditOpen(true)
   }
 
   async function save() {
     if (!a) return
+    const presentIds = form.presentApartmentIds.filter((pid) => apartments.some((apt) => apt.id === pid))
+    const presentWeight = apartments
+      .filter((apt) => presentIds.includes(apt.id))
+      .reduce((s, apt) => s + weightOf(apt), 0)
     await updateAssembly(a.id, {
       title: form.title.trim(),
+      location: form.location.trim() || undefined,
       scheduledAt: form.scheduledAt ? Timestamp.fromDate(new Date(form.scheduledAt)) : undefined,
       status: form.status,
       invitation: form.invitation.trim() || undefined,
       minutes: form.minutes.trim() || undefined,
       decisions: form.decisions.trim() || undefined,
-      presentWeight: Number(form.presentWeight) || undefined,
+      presentApartmentIds: presentIds,
+      presentWeight,
+      totalWeight: a.totalWeight ?? buildingWeight,
     })
     setEditOpen(false)
     await load()
   }
 
-  async function addAttachment() {
-    if (!a || !building || !file) return
+  async function addAttachment(section: AssemblySection, file: File) {
+    if (!a || !building) return
     setBusy(true)
     try {
       const up = await uploadReceipt(file, building.id)
-      const attachments = [...(a.attachments ?? []), { url: up.url, name: up.name, path: up.path }]
+      const attachments = [...(a.attachments ?? []), { ...up, section }]
       await updateAssembly(a.id, { attachments })
-      setFile(null)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function removeAttachment(att: AssemblyAttachment) {
+    if (!a) return
+    setBusy(true)
+    try {
+      const attachments = (a.attachments ?? []).filter((x) => x.path !== att.path)
+      await updateAssembly(a.id, { attachments })
+      await deleteFile(att.path)
       await load()
     } finally {
       setBusy(false)
@@ -99,9 +131,12 @@ export default function AssemblyView() {
     navigate('/assemblies')
   }
 
-  const total = a.totalWeight ?? 0
+  const attachments = a.attachments ?? []
+  const total = a.totalWeight ?? buildingWeight
   const present = a.presentWeight ?? 0
   const quorum = total ? Math.round((present / total) * 100) : 0
+
+  const sectionProps = { attachments, isManager, onUpload: addAttachment, onRemove: removeAttachment, busy }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -117,6 +152,11 @@ export default function AssemblyView() {
           <div>
             <h1 className="text-lg font-semibold text-gray-900">{a.title}</h1>
             <div className="mt-0.5 text-sm text-gray-500">{formatDateTime(a.scheduledAt)}</div>
+            {a.location && (
+              <div className="mt-0.5 inline-flex items-center gap-1 text-sm text-gray-500">
+                <MapPin size={14} /> {a.location}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Badge color={a.status === 'held' ? 'green' : 'amber'}>
@@ -153,42 +193,10 @@ export default function AssemblyView() {
         )}
       </Card>
 
-      <Section title="Πρόσκληση / Ημερήσια διάταξη" body={a.invitation} />
-      <Section title="Πρακτικά" body={a.minutes} />
-      <Section title="Αποφάσεις" body={a.decisions} />
-
-      {/* Attachments */}
-      <Card className="mt-4">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Έγγραφα</h2>
-        {(a.attachments ?? []).length === 0 && <p className="text-sm text-gray-400">Κανένα έγγραφο.</p>}
-        <ul className="space-y-1">
-          {(a.attachments ?? []).map((f, i) => (
-            <li key={i}>
-              <a
-                href={f.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
-              >
-                <Paperclip size={14} /> {f.name}
-              </a>
-            </li>
-          ))}
-        </ul>
-        {isManager && (
-          <div className="mt-3 flex items-center gap-2">
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block flex-1 text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-            />
-            <Button onClick={addAttachment} disabled={!file || busy}>
-              <Upload size={16} /> Ανέβασμα
-            </Button>
-          </div>
-        )}
-      </Card>
+      <SectionCard title="Πρόσκληση / Ημερήσια διάταξη" body={a.invitation} section="invitation" {...sectionProps} />
+      <SectionCard title="Πρακτικά" body={a.minutes} section="minutes" {...sectionProps} />
+      <SectionCard title="Αποφάσεις" body={a.decisions} section="decisions" {...sectionProps} />
+      <SectionCard title="Έγγραφα (γενικά)" section="general" {...sectionProps} />
 
       <Modal
         open={editOpen}
@@ -209,6 +217,13 @@ export default function AssemblyView() {
             <Field label="Τίτλος">
               <TextField value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </Field>
+            <Field label="Μέρος διεξαγωγής">
+              <TextField
+                placeholder="π.χ. ισόγειο πολυκατοικίας"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+              />
+            </Field>
             <Field label="Ημερομηνία">
               <TextField
                 type="datetime-local"
@@ -225,14 +240,15 @@ export default function AssemblyView() {
                 <option value="held">Πραγματοποιήθηκε</option>
               </SelectField>
             </Field>
-            <Field label="Παρόντα χιλιοστά (απαρτία)">
-              <TextField
-                type="number"
-                value={form.presentWeight}
-                onChange={(e) => setForm({ ...form, presentWeight: Number(e.target.value) })}
-              />
-            </Field>
           </div>
+
+          <PresentPicker
+            apartments={sortedApartments}
+            totalWeight={a.totalWeight ?? buildingWeight}
+            selected={form.presentApartmentIds}
+            onChange={(ids) => setForm({ ...form, presentApartmentIds: ids })}
+          />
+
           <EditArea label="Πρόσκληση / Ημερήσια διάταξη" value={form.invitation} onChange={(v) => setForm({ ...form, invitation: v })} />
           <EditArea label="Πρακτικά" value={form.minutes} onChange={(v) => setForm({ ...form, minutes: v })} />
           <EditArea label="Αποφάσεις" value={form.decisions} onChange={(v) => setForm({ ...form, decisions: v })} />
@@ -242,13 +258,178 @@ export default function AssemblyView() {
   )
 }
 
-function Section({ title, body }: { title: string; body?: string }) {
-  if (!body) return null
+function PresentPicker({
+  apartments,
+  totalWeight,
+  selected,
+  onChange,
+}: {
+  apartments: Apartment[]
+  totalWeight: number
+  selected: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const set = new Set(selected)
+  const presentWeight = apartments.filter((apt) => set.has(apt.id)).reduce((s, apt) => s + weightOf(apt), 0)
+  const quorum = totalWeight ? Math.round((presentWeight / totalWeight) * 100) : 0
+
+  function toggle(aptId: string) {
+    const next = new Set(set)
+    if (next.has(aptId)) next.delete(aptId)
+    else next.add(aptId)
+    onChange([...next])
+  }
+
+  return (
+    <Field label="Παρόντα διαμερίσματα (απαρτία)">
+      <div className="overflow-hidden rounded-md border border-gray-300">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+          <div className="flex items-center gap-2">
+            <button type="button" className="text-blue-600 hover:underline" onClick={() => onChange(apartments.map((apt) => apt.id))}>
+              Επιλογή όλων
+            </button>
+            <span className="text-gray-300">·</span>
+            <button type="button" className="text-blue-600 hover:underline" onClick={() => onChange([])}>
+              Καθαρισμός
+            </button>
+          </div>
+          <span className="tnum font-medium text-gray-700">
+            {mille(presentWeight)} / {mille(totalWeight)} χιλ. ({quorum}%)
+          </span>
+        </div>
+        {apartments.length === 0 ? (
+          <p className="px-3 py-3 text-sm text-gray-400">Δεν υπάρχουν διαμερίσματα.</p>
+        ) : (
+          <ul className="max-h-56 divide-y divide-gray-100 overflow-y-auto">
+            {apartments.map((apt) => (
+              <li key={apt.id}>
+                <label className="flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={set.has(apt.id)}
+                    onChange={() => toggle(apt.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="flex-1 truncate text-gray-800">
+                    {apt.code} — {apt.ownerName}
+                  </span>
+                  <span className="tnum text-gray-500">{mille(weightOf(apt))}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Field>
+  )
+}
+
+function SectionCard({
+  title,
+  body,
+  section,
+  attachments,
+  isManager,
+  onUpload,
+  onRemove,
+  busy,
+}: {
+  title: string
+  body?: string
+  section: AssemblySection
+  attachments: AssemblyAttachment[]
+  isManager: boolean
+  onUpload: (section: AssemblySection, file: File) => void | Promise<void>
+  onRemove: (att: AssemblyAttachment) => void | Promise<void>
+  busy: boolean
+}) {
+  const list = attachments.filter((x) => (x.section ?? 'general') === section)
+  // Hide empty sections from non-managers (nothing to show or do).
+  if (!isManager && !body && list.length === 0) return null
+
   return (
     <Card className="mt-4">
       <h2 className="mb-1 text-sm font-semibold text-gray-700">{title}</h2>
-      <p className="whitespace-pre-wrap text-sm text-gray-700">{body}</p>
+      {body ? (
+        <p className="whitespace-pre-wrap text-sm text-gray-700">{body}</p>
+      ) : (
+        section !== 'general' && <p className="text-sm text-gray-400">—</p>
+      )}
+      <AttachmentArea section={section} list={list} isManager={isManager} onUpload={onUpload} onRemove={onRemove} busy={busy} />
     </Card>
+  )
+}
+
+function AttachmentArea({
+  section,
+  list,
+  isManager,
+  onUpload,
+  onRemove,
+  busy,
+}: {
+  section: AssemblySection
+  list: AssemblyAttachment[]
+  isManager: boolean
+  onUpload: (section: AssemblySection, file: File) => void | Promise<void>
+  onRemove: (att: AssemblyAttachment) => void | Promise<void>
+  busy: boolean
+}) {
+  const [file, setFile] = useState<File | null>(null)
+
+  async function submit() {
+    if (!file) return
+    await onUpload(section, file)
+    setFile(null)
+  }
+
+  if (!isManager && list.length === 0) return null
+
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      {list.length === 0 && !isManager ? null : list.length === 0 ? (
+        <p className="text-xs text-gray-400">Κανένα συνημμένο.</p>
+      ) : (
+        <ul className="space-y-1">
+          {list.map((f) => (
+            <li key={f.path} className="flex items-center gap-2">
+              <a
+                href={f.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+              >
+                <Paperclip size={14} /> {f.name}
+              </a>
+              {isManager && (
+                <button
+                  onClick={() => onRemove(f)}
+                  disabled={busy}
+                  title="Διαγραφή"
+                  className="rounded p-0.5 text-gray-300 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {isManager && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            key={`${section}-${list.length}`}
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="block flex-1 text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+          />
+          <Button variant="secondary" onClick={submit} disabled={!file || busy}>
+            <Upload size={16} /> Επισύναψη
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

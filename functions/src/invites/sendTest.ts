@@ -3,6 +3,7 @@
 // Δεν αγγίζει κανένα user doc. Auth: μόνο διαχειριστές.
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
+import { logger } from 'firebase-functions/v2'
 import { getFirestore } from 'firebase-admin/firestore'
 import { loadInviteConfig } from './send'
 import { requireManager } from './auth'
@@ -53,7 +54,10 @@ export const sendTestInvite = onCall(
       })
       return { ok: true, channel: 'sms' }
     } catch (e) {
-      throw new HttpsError('internal', e instanceof Error ? e.message : 'Αποτυχία δοκιμής.')
+      if (e instanceof HttpsError) throw e
+      const msg = e instanceof Error ? e.message : String(e)
+      logger.error('[invite] test failed', { channel, error: e instanceof Error ? e.stack ?? msg : msg })
+      throw new HttpsError('failed-precondition', msg || 'Αποτυχία δοκιμής.')
     }
   },
 )

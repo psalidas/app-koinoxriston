@@ -10,6 +10,7 @@ import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
 import { uploadReceipt } from '@/lib/upload'
+import { UploadProgress } from '@/components/UploadProgress'
 import { logAudit } from '@/lib/audit'
 import { Paperclip } from 'lucide-react'
 
@@ -37,6 +38,7 @@ export default function Expenses() {
   const [toDelete, setToDelete] = useState<Expense | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [form, setForm] = useState<FormState>({
     group: 'koinoxrista',
     category: '',
@@ -102,14 +104,17 @@ export default function Expenses() {
     }
     try {
       if (file) {
-        const up = await uploadReceipt(file, building.id)
+        setUploadPct(0)
+        const up = await uploadReceipt(file, building.id, (p) => setUploadPct(p))
         receipt = { receiptUrl: up.url, receiptName: up.name, receiptPath: up.path }
       }
     } catch (err) {
       alert('Σφάλμα ανεβάσματος: ' + (err as Error).message)
       setUploading(false)
+      setUploadPct(null)
       return
     }
+    setUploadPct(null)
     const data = {
       buildingId: building.id,
       period,
@@ -327,6 +332,7 @@ export default function Expenses() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
+            <UploadProgress value={uploadPct} />
             {form.receiptUrl && !file && (
               <a
                 href={form.receiptUrl}

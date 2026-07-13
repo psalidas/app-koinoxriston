@@ -9,7 +9,8 @@ import { Modal } from '@/components/Modal'
 import { mille, formatDateTime } from '@/lib/format'
 import type { Apartment, Assembly, AssemblyAttachment, AssemblySection } from '@/types'
 import { getAssembly, updateAssembly, deleteAssembly } from '@/lib/repos/assemblies'
-import { uploadReceipt, deleteFile } from '@/lib/upload'
+import { uploadReceipt, deleteFile, type ProgressFn } from '@/lib/upload'
+import { UploadProgress } from '@/components/UploadProgress'
 
 const WEIGHT_SCALE = 'genika'
 const weightOf = (apt: Apartment) => apt.millesimes[WEIGHT_SCALE] ?? 0
@@ -99,14 +100,16 @@ export default function AssemblyView() {
     await load()
   }
 
-  async function addAttachment(section: AssemblySection, file: File) {
+  async function addAttachment(section: AssemblySection, file: File, onProgress?: ProgressFn) {
     if (!a || !building) return
     setBusy(true)
     try {
-      const up = await uploadReceipt(file, building.id)
+      const up = await uploadReceipt(file, building.id, onProgress)
       const attachments = [...(a.attachments ?? []), { ...up, section }]
       await updateAssembly(a.id, { attachments })
       await load()
+    } catch (err) {
+      alert((err as Error).message)
     } finally {
       setBusy(false)
     }
@@ -339,7 +342,7 @@ function SectionCard({
   section: AssemblySection
   attachments: AssemblyAttachment[]
   isManager: boolean
-  onUpload: (section: AssemblySection, file: File) => void | Promise<void>
+  onUpload: (section: AssemblySection, file: File, onProgress?: ProgressFn) => void | Promise<void>
   onRemove: (att: AssemblyAttachment) => void | Promise<void>
   busy: boolean
 }) {
@@ -371,16 +374,22 @@ function AttachmentArea({
   section: AssemblySection
   list: AssemblyAttachment[]
   isManager: boolean
-  onUpload: (section: AssemblySection, file: File) => void | Promise<void>
+  onUpload: (section: AssemblySection, file: File, onProgress?: ProgressFn) => void | Promise<void>
   onRemove: (att: AssemblyAttachment) => void | Promise<void>
   busy: boolean
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [pct, setPct] = useState<number | null>(null)
 
   async function submit() {
     if (!file) return
-    await onUpload(section, file)
-    setFile(null)
+    setPct(0)
+    try {
+      await onUpload(section, file, (p) => setPct(p))
+      setFile(null)
+    } finally {
+      setPct(null)
+    }
   }
 
   if (!isManager && list.length === 0) return null
@@ -429,6 +438,7 @@ function AttachmentArea({
           </Button>
         </div>
       )}
+      <UploadProgress value={pct} />
     </div>
   )
 }

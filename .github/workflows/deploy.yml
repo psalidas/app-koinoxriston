@@ -45,6 +45,6 @@ jobs:
       - name: Deploy
         run: >
           npx --yes firebase-tools@latest deploy
-          --only hosting,firestore:rules,firestore:indexes
+          --only hosting,firestore:rules
           --project app-koinoxriston
           --non-interactive

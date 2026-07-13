@@ -15,6 +15,7 @@ const db = admin.firestore()
 //   • resendInvite (callable) — χειροκίνητη επαναποστολή από τη λίστα χρηστών.
 export { onUserCreatedInvite } from './invites/onUserCreated'
 export { resendInvite } from './invites/resendInvite'
+export { sendTestInvite } from './invites/sendTest'
 
 interface UserDoc {
   name?: string

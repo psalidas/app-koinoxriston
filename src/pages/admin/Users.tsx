@@ -241,10 +241,14 @@ export default function Users() {
             Ενεργός λογαριασμός
           </label>
 
-          {(form.role === 'owner' || form.role === 'resident') && (
-            <div>
-              <div className="mb-1 text-sm font-medium text-gray-700">Διαμερίσματα</div>
-              <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-2">
+          <div>
+            <div className="mb-1 text-sm font-medium text-gray-700">
+              Διαμερίσματα / Ιδιοκτησία
+              {(form.role === 'admin' || form.role === 'manager') && (
+                <span className="ml-1 font-normal text-gray-400">(προαιρετικό — αν ο διαχειριστής είναι και ιδιοκτήτης)</span>
+              )}
+            </div>
+            <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-2">
                 {[...apartments]
                   .sort((a, b) => a.orderNo - b.orderNo)
                   .map((a) => (
@@ -264,7 +268,6 @@ export default function Users() {
                   ))}
               </div>
             </div>
-          )}
         </div>
       </Modal>
 

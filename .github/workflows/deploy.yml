@@ -11,12 +11,12 @@ on:
 #
 # ⚠️ Fill these in after you create the Firebase project (see docs/SETUP.md §2).
 env:
-  VITE_FIREBASE_API_KEY: 'REPLACE_ME'
+  VITE_FIREBASE_API_KEY: 'AIzaSyAw7R8h52wbXROp4919c28txFOuz9GAXQE'
   VITE_FIREBASE_AUTH_DOMAIN: 'app-koinoxriston.firebaseapp.com'
   VITE_FIREBASE_PROJECT_ID: 'app-koinoxriston'
   VITE_FIREBASE_STORAGE_BUCKET: 'app-koinoxriston.firebasestorage.app'
-  VITE_FIREBASE_MESSAGING_SENDER_ID: 'REPLACE_ME'
-  VITE_FIREBASE_APP_ID: 'REPLACE_ME'
+  VITE_FIREBASE_MESSAGING_SENDER_ID: '1081925615447'
+  VITE_FIREBASE_APP_ID: '1:1081925615447:web:9c65966d9cac93d09b4812'
 
 jobs:
   deploy:

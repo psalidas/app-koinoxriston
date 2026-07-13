@@ -53,6 +53,9 @@ export default function StatementView() {
           <Button variant="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Εκτύπωση
           </Button>
+          <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/notices`)}>
+            <Printer size={18} /> Όλα τα ειδοποιητήρια
+          </Button>
           {isManager && st.status !== 'issued' && (
             <Button onClick={issue}>
               <CheckCircle2 size={18} /> Οριστικοποίηση
@@ -61,7 +64,7 @@ export default function StatementView() {
         </div>
       </div>
 
-      <div className="print-area rounded-lg border border-gray-200 bg-white p-4 text-[11px] text-gray-900 shadow-sm">
+      <div className="print-area print-landscape rounded-lg border border-gray-200 bg-white p-4 text-[11px] text-gray-900 shadow-sm">
         {/* Header */}
         <div className="mb-3 border-b border-gray-300 pb-2 text-center">
           <h1 className="text-base font-bold tracking-wide">ΣΥΓΚΕΝΤΡΩΤΙΚΗ ΚΑΤΑΣΤΑΣΗ ΔΑΠΑΝΩΝ</h1>

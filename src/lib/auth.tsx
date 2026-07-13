@@ -75,7 +75,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return
         }
-        const identifier = user.email ?? user.phoneNumber
+        // Οι magic-link συνεδρίες φέρουν custom claim `identifier` (= το id του
+        // /users doc). Το προτιμούμε ώστε να βρίσκουμε πάντα το σωστό doc,
+        // ειδικά για κινητό (όπου user.phoneNumber μπορεί να λείπει).
+        let identifier = user.email ?? user.phoneNumber
+        try {
+          const claims = (await user.getIdTokenResult()).claims
+          if (typeof claims.identifier === 'string' && claims.identifier) {
+            identifier = claims.identifier
+          }
+        } catch {
+          // αγνόησε — θα χρησιμοποιήσουμε email/phone
+        }
         // Ποτέ να μη μείνει η εφαρμογή στο «Φόρτωση…» αν αποτύχει το read.
         let profile: UserDoc | null = null
         try {

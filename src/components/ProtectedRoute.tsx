@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/lib/auth'
+import { Button } from '@/components/forms'
 
 export function ProtectedRoute({
   children,
@@ -9,7 +10,7 @@ export function ProtectedRoute({
   children: ReactNode
   managerOnly?: boolean
 }) {
-  const { loading, user, hasAccess, isManager } = useAuth()
+  const { loading, user, hasAccess, isManager, signOut } = useAuth()
 
   if (loading) {
     return (
@@ -29,6 +30,12 @@ export function ProtectedRoute({
           Ο λογαριασμός σας δεν έχει ενεργοποιηθεί. Επικοινωνήστε με τον
           διαχειριστή της πολυκατοικίας.
         </p>
+        {user.email && (
+          <p className="text-xs text-gray-400">Συνδεδεμένος ως {user.email}</p>
+        )}
+        <Button variant="secondary" onClick={() => void signOut()} className="mt-2">
+          Αποσύνδεση / Δοκιμή άλλου λογαριασμού
+        </Button>
       </div>
     )
   }

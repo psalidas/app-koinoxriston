@@ -216,17 +216,24 @@ export default function Users() {
           {(form.role === 'owner' || form.role === 'resident') && (
             <div>
               <div className="mb-1 text-sm font-medium text-gray-700">Διαμερίσματα</div>
-              <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-3">
-                {apartments.map((a) => (
-                  <label key={a.id} className="flex items-center gap-1.5 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={form.apartmentIds.includes(a.id)}
-                      onChange={() => toggleApartment(a.id)}
-                    />
-                    {a.code}
-                  </label>
-                ))}
+              <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-2">
+                {[...apartments]
+                  .sort((a, b) => a.orderNo - b.orderNo)
+                  .map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="shrink-0"
+                        checked={form.apartmentIds.includes(a.id)}
+                        onChange={() => toggleApartment(a.id)}
+                      />
+                      <span className="font-medium">{a.code}</span>
+                      {a.ownerName && <span className="truncate text-gray-500">— {a.ownerName}</span>}
+                    </label>
+                  ))}
               </div>
             </div>
           )}

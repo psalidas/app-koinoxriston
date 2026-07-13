@@ -16,7 +16,7 @@ import { sendSmsTo } from './smsToClient'
 
 export const DEFAULT_APP_URL = 'https://app-koinoxriston.web.app'
 const DEFAULT_FROM_NAME = 'Διαχείριση Πολυκατοικίας'
-const DEFAULT_SMS_SENDER = 'Polykatoikia'
+const DEFAULT_SMS_SENDER = 'Diaxeirisi' // ≤11 λατινικά (όριο sms.to)
 
 export interface InviteConfig {
   enabled: boolean

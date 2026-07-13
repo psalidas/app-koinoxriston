@@ -7,7 +7,7 @@ export const DEFAULT_INVITE_SETTINGS: InviteSettings = {
   appUrl: 'https://app-koinoxriston.web.app',
   fromEmail: '',
   fromName: 'Διαχείριση Πολυκατοικίας',
-  smsSender: 'Polykatoikia',
+  smsSender: 'Diaxeirisi',
 }
 
 export async function getInviteSettings(): Promise<InviteSettings> {

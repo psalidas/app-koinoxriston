@@ -119,8 +119,12 @@ export default function InviteSettingsPage() {
             </Field>
           </div>
 
-          <Field label="Αποστολέας SMS (Sender ID)" hint="Αλφαριθμητικό, έως 11 χαρακτήρες.">
-            <TextField value={form.smsSender} onChange={(e) => set('smsSender', e.target.value)} />
+          <Field label="Αποστολέας SMS (Sender ID)" hint="Λατινικά/αριθμοί, έως 11 χαρακτήρες (όριο sms.to).">
+            <TextField
+              value={form.smsSender}
+              maxLength={11}
+              onChange={(e) => set('smsSender', e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 11))}
+            />
           </Field>
         </div>
 

@@ -18,17 +18,16 @@ export const redeemMagicLink = onCall(
       const db = getFirestore()
       const ref = db.doc(`magicTokens/${token}`)
 
-      // Single-use: επικύρωση + σήμανση σε transaction.
-      const identifier = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref)
-        if (!snap.exists) throw new HttpsError('not-found', 'Ο σύνδεσμος δεν είναι έγκυρος.')
-        const d = snap.data() as { identifier?: string; used?: boolean; expiresAt?: Timestamp }
-        if (d.used) throw new HttpsError('failed-precondition', 'Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί.')
-        const exp = d.expiresAt?.toMillis?.() ?? 0
-        if (Date.now() > exp) throw new HttpsError('deadline-exceeded', 'Ο σύνδεσμος έληξε.')
-        tx.update(ref, { used: true, usedAt: Timestamp.now() })
-        return d.identifier ?? ''
-      })
+      // 1) Επικύρωση (read-only) — ΔΕΝ μαρκάρουμε ακόμη «used», ώστε μια
+      //    παροδική αποτυχία παρακάτω να μην «καίει» τον σύνδεσμο.
+      const snap = await ref.get()
+      if (!snap.exists) throw new HttpsError('not-found', 'Ο σύνδεσμος δεν είναι έγκυρος.')
+      const d = snap.data() as { identifier?: string; used?: boolean; expiresAt?: Timestamp }
+      if (d.used) throw new HttpsError('failed-precondition', 'Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί.')
+      if (Date.now() > (d.expiresAt?.toMillis?.() ?? 0)) {
+        throw new HttpsError('deadline-exceeded', 'Ο σύνδεσμος έληξε.')
+      }
+      const identifier = d.identifier ?? ''
 
       const type = identifierType(identifier)
       const auth = getAuth()
@@ -50,6 +49,16 @@ export const redeemMagicLink = onCall(
       }
 
       const customToken = await auth.createCustomToken(uid)
+
+      // 2) Μόνο τώρα (μετά την επιτυχία) μαρκάρουμε single-use, ατομικά.
+      await db.runTransaction(async (tx) => {
+        const s = await tx.get(ref)
+        if (!s.exists || s.data()?.used) {
+          throw new HttpsError('failed-precondition', 'Ο σύνδεσμος έχει ήδη χρησιμοποιηθεί.')
+        }
+        tx.update(ref, { used: true, usedAt: Timestamp.now() })
+      })
+
       return { token: customToken }
     } catch (e) {
       if (e instanceof HttpsError) throw e

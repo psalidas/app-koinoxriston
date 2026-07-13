@@ -10,20 +10,14 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
   onAuthStateChanged,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  type ConfirmationResult,
   type User,
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
+import { requestMagicLink } from './magic'
 import type { Role, UserDoc } from '@/types'
 
 const BOOTSTRAP_ADMIN = 'michael@crowdpolicy.com'
-const EMAIL_LINK_KEY = 'koino:emailForSignIn'
 
 interface AuthState {
   loading: boolean
@@ -37,8 +31,8 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   signInWithGoogle: () => Promise<void>
-  sendEmailLink: (email: string) => Promise<void>
-  sendPhoneOtp: (phone: string, containerId: string) => Promise<ConfirmationResult>
+  /** Στέλνει magic link σε email ή κινητό (ενιαία είσοδος). */
+  sendMagicLink: (identifier: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -66,23 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) {
       setState((s) => ({ ...s, loading: false }))
       return
-    }
-
-    // Complete a passwordless email-link sign-in if we arrived via one.
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      let email = window.localStorage.getItem(EMAIL_LINK_KEY)
-      if (!email) {
-        email = window.prompt('Επιβεβαιώστε το email σας για την είσοδο:') || ''
-      }
-      if (email) {
-        signInWithEmailLink(auth, email, window.location.href)
-          .then(() => {
-            window.localStorage.removeItem(EMAIL_LINK_KEY)
-            // Clean the link params from the URL.
-            window.history.replaceState({}, document.title, window.location.pathname)
-          })
-          .catch((err) => console.error('Email-link sign-in failed', err))
-      }
     }
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -115,20 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithPopup(auth, provider)
   }
 
-  async function sendEmailLink(email: string) {
-    if (!auth) throw new Error('Firebase δεν έχει ρυθμιστεί')
-    const actionCodeSettings = {
-      url: window.location.origin,
-      handleCodeInApp: true,
-    }
-    await sendSignInLinkToEmail(auth, email, actionCodeSettings)
-    window.localStorage.setItem(EMAIL_LINK_KEY, email)
-  }
-
-  async function sendPhoneOtp(phone: string, containerId: string) {
-    if (!auth) throw new Error('Firebase δεν έχει ρυθμιστεί')
-    const verifier = new RecaptchaVerifier(auth, containerId, { size: 'invisible' })
-    return signInWithPhoneNumber(auth, phone, verifier)
+  async function sendMagicLink(identifier: string) {
+    await requestMagicLink(identifier.trim())
   }
 
   async function signOut() {
@@ -138,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, signInWithGoogle, sendEmailLink, sendPhoneOtp, signOut }}
+      value={{ ...state, signInWithGoogle, sendMagicLink, signOut }}
     >
       {children}
     </AuthContext.Provider>

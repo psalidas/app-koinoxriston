@@ -166,6 +166,11 @@ service cloud.firestore {
       allow read, write: if isManager();
     }
 
+    // Magic-link tokens — ΜΟΝΟ Admin SDK (functions). Καμία client πρόσβαση.
+    match /magicTokens/{token} {
+      allow read, write: if false;
+    }
+
     // Audit log — managers read; writes happen from trusted context only.
     match /auditLogs/{id} {
       allow read: if isManager();

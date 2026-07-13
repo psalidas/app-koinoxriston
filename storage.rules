@@ -6,6 +6,15 @@ rules_version = '2';
 // custom claims when the resident portal ships.
 service firebase.storage {
   match /b/{bucket}/o {
+    // Building documents (οικοδομική άδεια, κανονισμός, κ.λπ.) — any file type
+    // up to 25MB. Managed by managers; access is enforced at the app layer.
+    match /documents/{buildingId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // Everything else (receipts, offers, ticket photos) — images & PDFs only.
     match /{allPaths=**} {
       allow read: if request.auth != null;
       allow write: if request.auth != null

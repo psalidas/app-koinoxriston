@@ -411,6 +411,23 @@ export interface Assembly {
   createdAt?: Timestamp
 }
 
+// ── Documents (έγγραφα πολυκατοικίας, με φακέλους) ───────────────────────────────
+
+export interface DocEntry {
+  id: string
+  buildingId: string
+  kind: 'folder' | 'file'
+  name: string
+  parentId: string | null // null = ρίζα
+  // μόνο για kind === 'file'
+  url?: string
+  path?: string // storage path
+  size?: number
+  contentType?: string
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
 // ── Audit log ──────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

@@ -1,15 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, Megaphone, ChevronRight, Receipt, Save, IdCard } from 'lucide-react'
+import { Home, Megaphone, ChevronRight, Receipt } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
-import { Card, PageHeader, Badge, Field, TextField, Button } from '@/components/forms'
+import { Card, PageHeader, Badge } from '@/components/forms'
 import { money, mille, formatPeriod, formatDate } from '@/lib/format'
-import type { Announcement, ContactVisibility, Payment, Statement } from '@/types'
+import type { Announcement, Payment, Statement } from '@/types'
 import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
 import { listAnnouncements } from '@/lib/repos/announcements'
-import { getProfile, saveContact } from '@/lib/repos/directory'
 import { ledgerFor, type LedgerRow } from '@/lib/balances'
 
 interface AptView {
@@ -31,51 +30,6 @@ export default function Portal() {
   const [loading, setLoading] = useState(true)
 
   const myApartmentIds = profile?.apartmentIds ?? []
-  const identifier = profile?.email ?? ''
-
-  // Στοιχεία επικοινωνίας (self-service) + ορατότητα στον κατάλογο.
-  const [contact, setContact] = useState({ displayName: '', phone: '', mobile: '', email: '', note: '' })
-  const [visibility, setVisibility] = useState<ContactVisibility>({})
-  const [savingContact, setSavingContact] = useState(false)
-  const [contactMsg, setContactMsg] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!identifier) return
-    getProfile(identifier)
-      .then((p) => {
-        if (p) {
-          setContact({
-            displayName: p.displayName ?? '',
-            phone: p.phone ?? '',
-            mobile: p.mobile ?? '',
-            email: p.email ?? '',
-            note: p.note ?? '',
-          })
-          setVisibility(p.visibility ?? {})
-        } else {
-          setContact((c) => ({ ...c, displayName: profile?.name ?? '' }))
-        }
-      })
-      .catch(console.error)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identifier])
-
-  async function saveMyContact() {
-    if (!identifier || !profile) return
-    setSavingContact(true)
-    setContactMsg(null)
-    try {
-      const myApts = apartments.filter((a) => myApartmentIds.includes(a.id))
-      await saveContact(
-        identifier,
-        { ...contact, visibility },
-        { role: profile.role, name: profile.name, apartmentCodes: myApts.map((a) => a.code) },
-      )
-      setContactMsg('Αποθηκεύτηκε.')
-    } finally {
-      setSavingContact(false)
-    }
-  }
 
   useEffect(() => {
     if (!building) return
@@ -233,66 +187,6 @@ export default function Portal() {
         </div>
       )}
 
-      {/* Στοιχεία επικοινωνίας μου + ορατότητα στον κατάλογο */}
-      <Card className="mt-6">
-        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-          <IdCard size={16} /> Τα στοιχεία μου
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Επίλεξε ποια στοιχεία θα εμφανίζονται στον εσωτερικό{' '}
-          <Link to="/directory" className="text-blue-600 hover:underline">
-            κατάλογο
-          </Link>
-          . Ο διαχειριστής βλέπει πάντα όλα τα στοιχεία.
-        </p>
-        {contactMsg && (
-          <div className="mb-3 rounded-md bg-green-50 p-2 text-sm text-green-700">{contactMsg}</div>
-        )}
-        <div className="space-y-3">
-          <ContactField
-            label="Όνομα που εμφανίζεται"
-            value={contact.displayName}
-            onChange={(v) => setContact({ ...contact, displayName: v })}
-            visible={visibility.name}
-            onToggle={(b) => setVisibility({ ...visibility, name: b })}
-          />
-          <ContactField
-            label="Σταθερό τηλέφωνο"
-            value={contact.phone}
-            onChange={(v) => setContact({ ...contact, phone: v })}
-            visible={visibility.phone}
-            onToggle={(b) => setVisibility({ ...visibility, phone: b })}
-          />
-          <ContactField
-            label="Κινητό"
-            value={contact.mobile}
-            onChange={(v) => setContact({ ...contact, mobile: v })}
-            visible={visibility.mobile}
-            onToggle={(b) => setVisibility({ ...visibility, mobile: b })}
-          />
-          <ContactField
-            label="Email επικοινωνίας"
-            type="email"
-            value={contact.email}
-            onChange={(v) => setContact({ ...contact, email: v })}
-            visible={visibility.email}
-            onToggle={(b) => setVisibility({ ...visibility, email: b })}
-          />
-          <ContactField
-            label="Σημείωση (π.χ. ώρες επικοινωνίας)"
-            value={contact.note}
-            onChange={(v) => setContact({ ...contact, note: v })}
-            visible={visibility.note}
-            onToggle={(b) => setVisibility({ ...visibility, note: b })}
-          />
-        </div>
-        <div className="mt-4">
-          <Button onClick={saveMyContact} disabled={savingContact}>
-            <Save size={16} /> {savingContact ? 'Αποθήκευση…' : 'Αποθήκευση'}
-          </Button>
-        </div>
-      </Card>
-
       {/* Announcements */}
       <div className="mt-6">
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -322,34 +216,6 @@ export default function Portal() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function ContactField({
-  label,
-  value,
-  onChange,
-  visible,
-  onToggle,
-  type,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  visible?: boolean
-  onToggle: (b: boolean) => void
-  type?: string
-}): ReactNode {
-  return (
-    <div className="grid grid-cols-[1fr_auto] items-end gap-3">
-      <Field label={label}>
-        <TextField type={type} value={value} onChange={(e) => onChange(e.target.value)} />
-      </Field>
-      <label className="flex items-center gap-1.5 whitespace-nowrap pb-2 text-xs text-gray-600">
-        <input type="checkbox" checked={!!visible} onChange={(e) => onToggle(e.target.checked)} />
-        Ορατό
-      </label>
     </div>
   )
 }

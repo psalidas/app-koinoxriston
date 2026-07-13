@@ -10,6 +10,7 @@ import type { Ticket, TicketStatus } from '@/types'
 import { TICKET_CATEGORIES, TICKET_STATUS_LABELS } from '@/types'
 import { listTickets, createTicket, updateTicket, deleteTicket } from '@/lib/repos/tickets'
 import { uploadReceipt } from '@/lib/upload'
+import { UploadProgress } from '@/components/UploadProgress'
 
 const STATUS_COLOR: Record<TicketStatus, 'amber' | 'blue' | 'green'> = {
   open: 'amber',
@@ -24,6 +25,7 @@ export default function Tickets() {
   const [modalOpen, setModalOpen] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [toDelete, setToDelete] = useState<Ticket | null>(null)
   const myApartmentIds = profile?.apartmentIds ?? []
   const [form, setForm] = useState({
@@ -60,7 +62,8 @@ export default function Tickets() {
     try {
       let photo: { photoUrl?: string; photoPath?: string } = {}
       if (file) {
-        const up = await uploadReceipt(file, building.id)
+        setUploadPct(0)
+        const up = await uploadReceipt(file, building.id, (p) => setUploadPct(p))
         photo = { photoUrl: up.url, photoPath: up.path }
       }
       const apt = apartments.find((a) => a.id === form.apartmentId)
@@ -82,6 +85,7 @@ export default function Tickets() {
       alert((err as Error).message)
     } finally {
       setBusy(false)
+      setUploadPct(null)
     }
   }
 
@@ -228,6 +232,7 @@ export default function Tickets() {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
+            <UploadProgress value={uploadPct} />
           </Field>
         </div>
       </Modal>

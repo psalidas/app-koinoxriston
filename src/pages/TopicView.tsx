@@ -19,6 +19,7 @@ import {
   deleteOffer,
 } from '@/lib/repos/topics'
 import { uploadReceipt } from '@/lib/upload'
+import { UploadProgress } from '@/components/UploadProgress'
 
 export default function TopicView() {
   const { id } = useParams()
@@ -33,6 +34,7 @@ export default function TopicView() {
   const [offerForm, setOfferForm] = useState({ vendor: '', amount: 0, description: '' })
   const [offerFile, setOfferFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
+  const [uploadPct, setUploadPct] = useState<number | null>(null)
 
   const authorName = profile?.name ?? user?.email ?? 'Χρήστης'
 
@@ -68,7 +70,8 @@ export default function TopicView() {
     try {
       let f: { fileUrl?: string; filePath?: string; fileName?: string } = {}
       if (offerFile) {
-        const up = await uploadReceipt(offerFile, building.id)
+        setUploadPct(0)
+        const up = await uploadReceipt(offerFile, building.id, (p) => setUploadPct(p))
         f = { fileUrl: up.url, filePath: up.path, fileName: up.name }
       }
       await createOffer({
@@ -85,8 +88,11 @@ export default function TopicView() {
       setOfferFile(null)
       setOfferOpen(false)
       await load()
+    } catch (err) {
+      alert((err as Error).message)
     } finally {
       setBusy(false)
+      setUploadPct(null)
     }
   }
 
@@ -272,6 +278,7 @@ export default function TopicView() {
               onChange={(e) => setOfferFile(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
+            <UploadProgress value={uploadPct} />
           </Field>
         </div>
       </Modal>

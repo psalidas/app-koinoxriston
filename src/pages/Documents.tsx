@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { UploadProgress } from '@/components/UploadProgress'
 import { formatDate } from '@/lib/format'
 import type { DocEntry } from '@/types'
 import {
@@ -46,6 +47,8 @@ export default function Documents() {
   const [renaming, setRenaming] = useState<DocEntry | null>(null)
   const [renameName, setRenameName] = useState('')
   const [toDelete, setToDelete] = useState<DocEntry | null>(null)
+  const [upload, setUpload] = useState<{ current: number; total: number; name: string; pct: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function load() {
@@ -114,10 +117,16 @@ export default function Documents() {
 
   async function onFilesChosen(files: FileList | null) {
     if (!building || !files || files.length === 0) return
+    setError(null)
     setBusy(true)
+    const list = Array.from(files)
+    let done = 0
     try {
-      for (const file of Array.from(files)) {
-        const up = await uploadDocument(file, building.id)
+      for (const file of list) {
+        setUpload({ current: done + 1, total: list.length, name: file.name, pct: 0 })
+        const up = await uploadDocument(file, building.id, (pct) =>
+          setUpload({ current: done + 1, total: list.length, name: file.name, pct }),
+        )
         await createFileEntry({
           buildingId: building.id,
           name: file.name,
@@ -128,6 +137,7 @@ export default function Documents() {
           contentType: file.type || undefined,
           createdBy: user?.email ?? undefined,
         })
+        done++
       }
       await logAudit({
         buildingId: building.id,
@@ -135,11 +145,17 @@ export default function Documents() {
         userName: profile?.name ?? user?.email ?? '',
         action: 'upload',
         entity: 'document',
-        entityId: `${files.length} αρχείο(α)`,
+        entityId: `${list.length} αρχείο(α)`,
       })
+      await load()
+    } catch (err) {
+      setError(
+        `Το ανέβασμα απέτυχε${done ? ` μετά από ${done} αρχείο(α)` : ''}: ${(err as Error).message}`,
+      )
       await load()
     } finally {
       setBusy(false)
+      setUpload(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
@@ -235,6 +251,24 @@ export default function Documents() {
           </span>
         ))}
       </nav>
+
+      {upload && (
+        <div className="mb-3">
+          <UploadProgress
+            value={upload.pct}
+            label={
+              upload.total > 1
+                ? `Ανέβασμα ${upload.current}/${upload.total}: ${upload.name}`
+                : `Ανέβασμα: ${upload.name}`
+            }
+          />
+        </div>
+      )}
+      {error && (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <Card className="p-0">
         {loading ? (

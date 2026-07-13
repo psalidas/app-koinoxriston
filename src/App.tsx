@@ -29,6 +29,7 @@ import Documents from './pages/Documents'
 import Users from './pages/admin/Users'
 import AuditLog from './pages/admin/AuditLog'
 import BuildingSettings from './pages/admin/BuildingSettings'
+import InviteSettings from './pages/admin/InviteSettings'
 
 export default function App() {
   return (
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/contracts" element={<Contracts />} />
           <Route path="/import" element={<ImportExport />} />
           <Route path="/admin/users" element={<Users />} />
+          <Route path="/admin/invites" element={<InviteSettings />} />
           <Route path="/admin/audit" element={<AuditLog />} />
           <Route path="/admin/settings" element={<BuildingSettings />} />
         </Route>

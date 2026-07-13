@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, SelectField, Badge } from '@/components/forms'
@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type { Role, UserDoc } from '@/types'
 import { ROLE_LABELS } from '@/types'
 import { listUsers, saveUser, deleteUser } from '@/lib/repos/users'
+import { resendInvite } from '@/lib/invites'
 import { logAudit } from '@/lib/audit'
 
 const emptyForm = () => ({
@@ -27,9 +28,23 @@ export default function Users() {
   const [editing, setEditing] = useState<UserDoc | null>(null)
   const [form, setForm] = useState(emptyForm())
   const [toDelete, setToDelete] = useState<UserDoc | null>(null)
+  const [resending, setResending] = useState<string | null>(null)
 
   async function load() {
     setUsers(await listUsers())
+  }
+
+  async function doResend(u: UserDoc) {
+    setResending(u.email)
+    try {
+      const res = await resendInvite(u.email)
+      alert(`Η πρόσκληση στάλθηκε (${res.channel === 'sms' ? 'SMS' : 'email'}).`)
+      await load()
+    } catch (e) {
+      alert('Αποτυχία αποστολής: ' + (e as Error).message)
+    } finally {
+      setResending(null)
+    }
   }
 
   useEffect(() => {
@@ -127,12 +142,25 @@ export default function Users() {
                   <Badge color="blue">{ROLE_LABELS[u.role]}</Badge>
                 </td>
                 <td className="px-3 py-2">
-                  <Badge color={u.active !== false ? 'green' : 'gray'}>
-                    {u.active !== false ? 'Ενεργός' : 'Ανενεργός'}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge color={u.active !== false ? 'green' : 'gray'}>
+                      {u.active !== false ? 'Ενεργός' : 'Ανενεργός'}
+                    </Badge>
+                    {u.invitedAt && (
+                      <Badge color="blue">Προσκλήθηκε{u.inviteChannel === 'sms' ? ' (SMS)' : ''}</Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
+                    <button
+                      onClick={() => doResend(u)}
+                      disabled={resending === u.email}
+                      title="Επαναποστολή πρόσκλησης"
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50"
+                    >
+                      <Send size={16} />
+                    </button>
                     <button
                       onClick={() => openEdit(u)}
                       className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"

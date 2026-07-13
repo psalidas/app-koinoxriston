@@ -159,6 +159,13 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    // App settings (π.χ. settings/invites) — managers only. Τα API keys ΔΕΝ
+    // ζουν εδώ (μένουν στα functions env). Οι Cloud Functions διαβάζουν με
+    // Admin SDK (bypass rules).
+    match /settings/{id} {
+      allow read, write: if isManager();
+    }
+
     // Audit log — managers read; writes happen from trusted context only.
     match /auditLogs/{id} {
       allow read: if isManager();

@@ -7,10 +7,14 @@ setGlobalOptions({ region: 'europe-west1', maxInstances: 5 })
 
 const db = admin.firestore()
 
-// Πρόσκληση νέου χρήστη (email μέσω Brevo / SMS μέσω sms.to) — κανάλι ανάλογα
-// με το κύριο αναγνωριστικό. Secrets: BREVO_API_KEY, SMSTO_API_KEY.
-// Config: Firestore `settings/invites`. Δες docs/SETUP.md §10.3.
+// Προσκλήσεις χρηστών (email μέσω Brevo / SMS μέσω sms.to) — κανάλι ανάλογα
+// με το κύριο αναγνωριστικό. API keys από functions env (GitHub Secrets → CI):
+// BREVO_API_KEY, SMSTO_API_KEY. Config: Firestore `settings/invites`
+// (Διαχείριση → Προσκλήσεις). Δες docs/SETUP.md §10.3.
+//   • onUserCreatedInvite — αυτόματα σε δημιουργία χρήστη.
+//   • resendInvite (callable) — χειροκίνητη επαναποστολή από τη λίστα χρηστών.
 export { onUserCreatedInvite } from './invites/onUserCreated'
+export { resendInvite } from './invites/resendInvite'
 
 interface UserDoc {
   name?: string

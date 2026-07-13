@@ -19,7 +19,19 @@ export interface UserDoc {
   buildingIds: string[]
   apartmentIds: string[]
   active: boolean
+  invitedAt?: Timestamp // πότε στάλθηκε πρόσκληση εισόδου
+  inviteChannel?: 'email' | 'sms'
   createdAt?: Timestamp
+}
+
+/** Ρυθμίσεις προσκλήσεων (Firestore `settings/invites`). Τα API keys ΔΕΝ
+ *  ζουν εδώ — μένουν στα functions env (GitHub Secrets). */
+export interface InviteSettings {
+  enabled: boolean
+  appUrl: string
+  fromEmail: string // πρέπει να είναι verified sender στο Brevo
+  fromName: string
+  smsSender: string // alphanumeric ≤11 χαρ.
 }
 
 // ── Buildings, apartments, people ────────────────────────────────────────────

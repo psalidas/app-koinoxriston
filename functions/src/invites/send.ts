@@ -1,0 +1,115 @@
+// Κοινή λογική αποστολής πρόσκλησης — χρησιμοποιείται και από τον trigger
+// (onUserCreated) και από το callable (resendInvite).
+//
+// Κανάλι ανάλογα με το ΚΥΡΙΟ αναγνωριστικό (= doc id του χρήστη):
+//   • email  → Brevo transactional email  (env: BREVO_API_KEY)
+//   • κινητό → SMS.to                       (env: SMSTO_API_KEY)
+//
+// Τα API keys έρχονται από GitHub Secrets → γράφονται ως env vars των
+// functions στο CI (functions/.env). Μη-ευαίσθητο config: Firestore
+// `settings/invites`.
+
+import { logger } from 'firebase-functions/v2'
+import { Timestamp } from 'firebase-admin/firestore'
+import { sendBrevoEmail } from './brevoClient'
+import { sendSmsTo } from './smsToClient'
+
+export const DEFAULT_APP_URL = 'https://app-koinoxriston.web.app'
+const DEFAULT_FROM_NAME = 'Διαχείριση Πολυκατοικίας'
+const DEFAULT_SMS_SENDER = 'Polykatoikia'
+
+export interface InviteConfig {
+  enabled: boolean
+  appUrl: string
+  fromEmail: string
+  fromName: string
+  smsSender: string
+}
+
+export async function loadInviteConfig(db: FirebaseFirestore.Firestore): Promise<InviteConfig> {
+  const str = (v: unknown, fallback: string) =>
+    typeof v === 'string' && v.trim() ? v.trim() : fallback
+  try {
+    const snap = await db.doc('settings/invites').get()
+    const d = (snap.exists ? snap.data() : {}) ?? {}
+    return {
+      enabled: d.enabled !== false,
+      appUrl: str(d.appUrl, DEFAULT_APP_URL),
+      fromEmail: typeof d.fromEmail === 'string' ? d.fromEmail.trim() : '',
+      fromName: str(d.fromName, DEFAULT_FROM_NAME),
+      smsSender: str(d.smsSender, DEFAULT_SMS_SENDER),
+    }
+  } catch {
+    return {
+      enabled: true,
+      appUrl: DEFAULT_APP_URL,
+      fromEmail: '',
+      fromName: DEFAULT_FROM_NAME,
+      smsSender: DEFAULT_SMS_SENDER,
+    }
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string)
+}
+
+const isEmail = (id: string) => id.includes('@')
+const isPhone = (id: string) => /^\+?\d[\d\s]{6,}$/.test(id)
+
+/**
+ * Στέλνει πρόσκληση στον χρήστη `userId` και, σε επιτυχία, γράφει
+ * `invitedAt`/`inviteChannel` πίσω στο doc. Ρίχνει Error με ανθρωποαναγνώσιμο
+ * μήνυμα σε αποτυχία (λείπον key/config, απόρριψη παρόχου, άγνωστο id).
+ */
+export async function sendInvite(
+  db: FirebaseFirestore.Firestore,
+  userId: string,
+  data: FirebaseFirestore.DocumentData,
+  cfg: InviteConfig,
+): Promise<'email' | 'sms'> {
+  const name = typeof data.name === 'string' ? data.name : ''
+  const url = cfg.appUrl
+  const mark = (channel: 'email' | 'sms') =>
+    db.doc(`users/${userId}`).set({ invitedAt: Timestamp.now(), inviteChannel: channel }, { merge: true })
+
+  if (isEmail(userId)) {
+    const key = process.env.BREVO_API_KEY
+    if (!key) throw new Error('Λείπει το BREVO_API_KEY (GitHub secret / functions env).')
+    if (!cfg.fromEmail) {
+      throw new Error('Δεν έχει οριστεί «Email αποστολέα» στις Ρυθμίσεις προσκλήσεων.')
+    }
+    const greeting = name ? `Γεια σας ${escapeHtml(name)},` : 'Γεια σας,'
+    const html =
+      `<p>${greeting}</p>` +
+      `<p>Σας δόθηκε πρόσβαση στην εφαρμογή <b>Διαχείριση Πολυκατοικίας</b>.</p>` +
+      `<p>Μπείτε εδώ και συνδεθείτε με αυτό το email (Google ή σύνδεσμος εισόδου):</p>` +
+      `<p><a href="${url}">${url}</a></p>` +
+      `<p>—<br>Ο διαχειριστής της πολυκατοικίας</p>`
+    await sendBrevoEmail(key, {
+      toEmail: userId,
+      toName: name || undefined,
+      subject: 'Πρόσκληση — Διαχείριση Πολυκατοικίας',
+      html,
+      fromEmail: cfg.fromEmail,
+      fromName: cfg.fromName,
+    })
+    await mark('email')
+    return 'email'
+  }
+
+  if (isPhone(userId)) {
+    const key = process.env.SMSTO_API_KEY
+    if (!key) throw new Error('Λείπει το SMSTO_API_KEY (GitHub secret / functions env).')
+    const to = userId.startsWith('+') ? userId : `+${userId.replace(/\s+/g, '')}`
+    const message =
+      `Σας δόθηκε πρόσβαση στη Διαχείριση Πολυκατοικίας. ` +
+      `Συνδεθείτε με το κινητό σας: ${url}`
+    await sendSmsTo(key, { to, message, sender: cfg.smsSender })
+    await mark('sms')
+    logger.info('[invite] sms invite sent', { userId })
+    return 'sms'
+  }
+
+  throw new Error('Το αναγνωριστικό του χρήστη δεν είναι email ούτε κινητό.')
+}

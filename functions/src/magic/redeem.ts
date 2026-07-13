@@ -48,7 +48,10 @@ export const redeemMagicLink = onCall(
         throw new HttpsError('failed-precondition', 'Μη έγκυρο αναγνωριστικό.')
       }
 
-      const customToken = await auth.createCustomToken(uid)
+      // Περνάμε το «identifier» ως custom claim ώστε τα Firestore rules να
+      // ταυτοποιούν αξιόπιστα τον χρήστη (email ή κινητό) ανεξάρτητα από το
+      // αν το token φέρει email/phone_number claim.
+      const customToken = await auth.createCustomToken(uid, { identifier })
 
       // 2) Μόνο τώρα (μετά την επιτυχία) μαρκάρουμε single-use, ατομικά.
       await db.runTransaction(async (tx) => {

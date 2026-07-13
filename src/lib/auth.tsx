@@ -63,25 +63,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        setState({
-          loading: false,
-          user: null,
-          profile: null,
-          hasAccess: false,
-          role: null,
-          isManager: false,
-        })
-        return
+      try {
+        if (!user) {
+          setState({
+            loading: false,
+            user: null,
+            profile: null,
+            hasAccess: false,
+            role: null,
+            isManager: false,
+          })
+          return
+        }
+        const identifier = user.email ?? user.phoneNumber
+        // Ποτέ να μη μείνει η εφαρμογή στο «Φόρτωση…» αν αποτύχει το read.
+        let profile: UserDoc | null = null
+        try {
+          profile = await loadProfile(identifier)
+        } catch (err) {
+          console.error('loadProfile failed', err)
+        }
+        const isBootstrap = user.email === BOOTSTRAP_ADMIN
+        const role: Role | null = profile?.role ?? (isBootstrap ? 'admin' : null)
+        const hasAccess = isBootstrap || (!!profile && profile.active !== false)
+        const isManager =
+          isBootstrap || role === 'admin' || role === 'manager'
+        setState({ loading: false, user, profile, hasAccess, role, isManager })
+      } catch (err) {
+        console.error('auth state handler failed', err)
+        setState((s) => ({ ...s, loading: false }))
       }
-      const identifier = user.email ?? user.phoneNumber
-      const profile = await loadProfile(identifier)
-      const isBootstrap = user.email === BOOTSTRAP_ADMIN
-      const role: Role | null = profile?.role ?? (isBootstrap ? 'admin' : null)
-      const hasAccess = isBootstrap || (!!profile && profile.active !== false)
-      const isManager =
-        isBootstrap || role === 'admin' || role === 'manager'
-      setState({ loading: false, user, profile, hasAccess, role, isManager })
     })
     return () => unsub()
   }, [])

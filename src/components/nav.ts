@@ -17,6 +17,7 @@ import {
   Upload,
   Users,
   History,
+  Send,
   Settings,
   UserCircle,
   type LucideIcon,
@@ -47,6 +48,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
   { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
+  { to: '/admin/invites', label: 'Προσκλήσεις', icon: Send, section: 'Διαχείριση' },
   { to: '/admin/audit', label: 'Ιστορικό', icon: History, section: 'Διαχείριση' },
   { to: '/admin/settings', label: 'Ρυθμίσεις κτιρίου', icon: Settings, section: 'Διαχείριση' },
 ]

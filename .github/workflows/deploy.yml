@@ -42,9 +42,33 @@ jobs:
           echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
-      - name: Deploy
+      - name: Deploy hosting, rules, indexes, storage
         run: >
           npx --yes firebase-tools@latest deploy
           --only hosting,firestore:rules,firestore:indexes,storage
+          --project app-koinoxriston
+          --non-interactive
+
+      # ── Cloud Functions (προσκλήσεις email/SMS) ────────────────────────────
+      # API keys έρχονται από GitHub Secrets και γράφονται ως env vars των
+      # functions (functions/.env, gitignored). Ξεχωριστό βήμα ώστε τυχόν
+      # αποτυχία (π.χ. IAM) να μην επηρεάζει το hosting που ανέβηκε παραπάνω.
+      - name: Prepare functions env
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          SMSTO_API_KEY: ${{ secrets.SMSTO_API_KEY }}
+        run: |
+          {
+            printf 'BREVO_API_KEY=%s\n' "$BREVO_API_KEY"
+            printf 'SMSTO_API_KEY=%s\n' "$SMSTO_API_KEY"
+          } > functions/.env
+
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Deploy functions
+        run: >
+          npx --yes firebase-tools@latest deploy
+          --only functions
           --project app-koinoxriston
           --non-interactive

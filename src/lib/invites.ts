@@ -11,3 +11,17 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean; chann
   const res = await fn({ userId })
   return res.data
 }
+
+/** Δοκιμαστική αποστολή σε συγκεκριμένο παραλήπτη (email ή κινητό). */
+export async function sendTestInvite(
+  channel: 'email' | 'sms',
+  to: string,
+): Promise<{ ok: boolean; channel: 'email' | 'sms' }> {
+  if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')
+  const fn = httpsCallable<{ channel: 'email' | 'sms'; to: string }, { ok: boolean; channel: 'email' | 'sms' }>(
+    functions,
+    'sendTestInvite',
+  )
+  const res = await fn({ channel, to })
+  return res.data
+}

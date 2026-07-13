@@ -5,22 +5,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { getFirestore } from 'firebase-admin/firestore'
 import { loadInviteConfig, sendInvite } from './send'
-
-const BOOTSTRAP_ADMIN_EMAIL = 'michael@crowdpolicy.com'
-
-async function requireManager(
-  db: FirebaseFirestore.Firestore,
-  auth: { token?: { email?: string } } | undefined,
-): Promise<void> {
-  const email = auth?.token?.email?.toLowerCase()
-  if (!email) throw new HttpsError('unauthenticated', 'Δεν είστε συνδεδεμένος.')
-  if (email === BOOTSTRAP_ADMIN_EMAIL) return
-  const snap = await db.doc(`users/${email}`).get()
-  const role = snap.exists ? (snap.data()?.role as string | undefined) : undefined
-  if (role !== 'admin' && role !== 'manager') {
-    throw new HttpsError('permission-denied', 'Απαιτείται ρόλος διαχειριστή.')
-  }
-}
+import { requireManager } from './auth'
 
 export const resendInvite = onCall(
   { invoker: 'public' },

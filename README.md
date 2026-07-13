@@ -66,3 +66,4 @@ Cloud Functions (Blaze + extension) — δες [`docs/DEPLOYMENT.md`](./docs/DEP
 - [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — runbook deploy, ρόλοι, troubleshooting, τρέχουσα κατάσταση
 - [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) — παρακολούθηση CI/deploy από τον agent
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) — φάσεις υλοποίησης & κατάσταση
+- [`docs/HANDOFF.md`](./docs/HANDOFF.md) — σύνοψη session, κατάσταση & επόμενα βήματα

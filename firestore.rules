@@ -175,6 +175,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Ιδιωτικό προφίλ επικοινωνίας — ο χρήστης το επεξεργάζεται μόνος του·
+    // ορατό στον ίδιο και στους διαχειριστές (πλήρη στοιχεία).
+    match /profiles/{id} {
+      allow read: if isManager() || (isAuthed() && uid() == id);
+      allow write: if isManager() || (isAuthed() && uid() == id);
+    }
+
+    // Κατάλογος ιδιοκτητών/ενοίκων — περιέχει μόνο τα ορατά πεδία (φιλτράρονται
+    // κατά την εγγραφή). Όλοι οι γνωστοί χρήστες διαβάζουν· ο καθένας γράφει
+    // μόνο τη δική του εγγραφή.
+    match /directory/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager() || (isAuthed() && uid() == id);
+    }
+
     // Audit log — managers read; writes happen from trusted context only.
     match /auditLogs/{id} {
       allow read: if isManager();

@@ -27,6 +27,7 @@ import PollView from './pages/PollView'
 import Assemblies from './pages/Assemblies'
 import AssemblyView from './pages/AssemblyView'
 import Documents from './pages/Documents'
+import Directory from './pages/Directory'
 import Users from './pages/admin/Users'
 import AuditLog from './pages/admin/AuditLog'
 import BuildingSettings from './pages/admin/BuildingSettings'
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/assemblies" element={<Assemblies />} />
         <Route path="/assemblies/:id" element={<AssemblyView />} />
         <Route path="/documents" element={<Documents />} />
+        <Route path="/directory" element={<Directory />} />
         <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
 
         {/* Manager-only */}

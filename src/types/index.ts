@@ -423,6 +423,43 @@ export interface Assembly {
   createdAt?: Timestamp
 }
 
+// ── Contact profiles & directory (κατάλογος ιδιοκτητών/ενοίκων) ──────────────────
+
+export interface ContactVisibility {
+  name?: boolean
+  phone?: boolean
+  mobile?: boolean
+  email?: boolean
+  note?: boolean
+}
+
+/** Ιδιωτικό προφίλ επικοινωνίας — ο χρήστης το επεξεργάζεται μόνος του
+ *  (`profiles/{identifier}`). Ορατό μόνο στον ίδιο και στους διαχειριστές. */
+export interface ContactProfile {
+  identifier: string // = id του /users doc (email ή κινητό)
+  displayName?: string
+  phone?: string // σταθερό
+  mobile?: string // κινητό
+  email?: string // email επικοινωνίας
+  note?: string
+  visibility: ContactVisibility
+  updatedAt?: Timestamp
+}
+
+/** Εγγραφή καταλόγου (`directory/{identifier}`) — περιέχει ΜΟΝΟ όσα πεδία
+ *  επέλεξε ο χρήστης να είναι ορατά. Ορατό σε όλους τους γνωστούς χρήστες. */
+export interface DirectoryEntry {
+  identifier: string
+  role: Role
+  apartmentCodes: string[]
+  name?: string
+  phone?: string
+  mobile?: string
+  email?: string
+  note?: string
+  updatedAt?: Timestamp
+}
+
 // ── Documents (έγγραφα πολυκατοικίας, με φακέλους) ───────────────────────────────
 
 export interface DocEntry {

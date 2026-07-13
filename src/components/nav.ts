@@ -21,6 +21,7 @@ import {
   Send,
   Settings,
   UserCircle,
+  IdCard,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -57,6 +58,7 @@ const MANAGER_NAV: NavItem[] = [
 
 const RESIDENT_NAV: NavItem[] = [
   { to: '/portal', label: 'Η καρτέλα μου', icon: UserCircle },
+  { to: '/my-profile', label: 'Τα στοιχεία μου', icon: IdCard },
   { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
   { to: '/topics', label: 'Συζήτηση', icon: MessagesSquare },
   { to: '/polls', label: 'Ψηφοφορίες', icon: Vote },

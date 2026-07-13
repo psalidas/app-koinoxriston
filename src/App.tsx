@@ -20,6 +20,7 @@ import Announcements from './pages/Announcements'
 import Tickets from './pages/Tickets'
 import Contracts from './pages/Contracts'
 import Portal from './pages/Portal'
+import MyProfile from './pages/MyProfile'
 import Topics from './pages/Topics'
 import TopicView from './pages/TopicView'
 import Polls from './pages/Polls'
@@ -47,6 +48,7 @@ export default function App() {
       >
         {/* Shared (managers + residents) */}
         <Route path="/portal" element={<Portal />} />
+        <Route path="/my-profile" element={<MyProfile />} />
         <Route path="/announcements" element={<Announcements />} />
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/topics" element={<Topics />} />

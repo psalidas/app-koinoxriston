@@ -16,24 +16,72 @@ body {
   @apply bg-gray-50 text-gray-900 antialiased;
 }
 
-/* Print: show only the statement, hide app chrome. */
+/* Tabular figures for money/millesime columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Print ─────────────────────────────────────────────────────────────────
+   Default portrait (ατομικά ειδοποιητήρια). Η συγκεντρωτική κατάσταση παίρνει
+   `.print-landscape`. */
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+@page landscape {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
-  .print-area {
-    position: absolute;
-    inset: 0;
-    margin: 0;
-    padding: 0;
-  }
-  @page {
-    size: A4 landscape;
-    margin: 8mm;
-  }
-}
 
-/* Tabular figures for money/millesime columns. */
-.tnum {
-  font-variant-numeric: tabular-nums;
+  /* Ξεκλείδωμα του app shell ώστε το περιεχόμενο να ρέει σε πολλές σελίδες
+     (αλλιώς το h-screen/overflow-hidden κόβει την εκτύπωση στην 1η σελίδα). */
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .app-main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* Εκτύπωση φόντων/περιγραμμάτων (κεφαλίδες πινάκων κ.λπ.). */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-area {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .print-area * {
+    overflow: visible !important;
+  }
+
+  .print-landscape {
+    page: landscape;
+  }
+
+  /* Μία εγγραφή ανά σελίδα για μαζική εκτύπωση. */
+  .print-page {
+    break-inside: avoid;
+  }
+  .print-page + .print-page {
+    break-before: page;
+  }
 }

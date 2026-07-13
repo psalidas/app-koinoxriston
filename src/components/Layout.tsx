@@ -9,9 +9,9 @@ export function Layout() {
 
   return (
     <AppDataProvider>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="app-shell flex h-screen overflow-hidden bg-gray-50">
         {/* Desktop sidebar */}
-        <aside className="hidden w-60 shrink-0 border-r border-gray-200 bg-white lg:block">
+        <aside className="no-print hidden w-60 shrink-0 border-r border-gray-200 bg-white lg:block">
           <Sidebar />
         </aside>
 
@@ -26,8 +26,10 @@ export function Layout() {
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar onMenu={() => setDrawerOpen(true)} />
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="no-print">
+            <Topbar onMenu={() => setDrawerOpen(true)} />
+          </div>
+          <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
           </main>
         </div>

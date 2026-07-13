@@ -15,7 +15,7 @@ export default function Assemblies() {
   const { isManager, user } = useAuth()
   const [items, setItems] = useState<Assembly[]>([])
   const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ title: '', scheduledAt: '', invitation: '' })
+  const [form, setForm] = useState({ title: '', location: '', scheduledAt: '', invitation: '' })
 
   async function load() {
     if (!building) return
@@ -33,13 +33,14 @@ export default function Assemblies() {
     await createAssembly({
       buildingId: building.id,
       title: form.title.trim(),
+      location: form.location.trim() || undefined,
       scheduledAt: form.scheduledAt ? Timestamp.fromDate(new Date(form.scheduledAt)) : undefined,
       invitation: form.invitation.trim() || undefined,
       status: 'planned',
       totalWeight,
       createdBy: user?.email ?? undefined,
     })
-    setForm({ title: '', scheduledAt: '', invitation: '' })
+    setForm({ title: '', location: '', scheduledAt: '', invitation: '' })
     setModalOpen(false)
     await load()
   }
@@ -105,6 +106,13 @@ export default function Assemblies() {
               placeholder="π.χ. Τακτική Γενική Συνέλευση 2026"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </Field>
+          <Field label="Μέρος διεξαγωγής">
+            <TextField
+              placeholder="π.χ. ισόγειο πολυκατοικίας"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
             />
           </Field>
           <Field label="Ημερομηνία">

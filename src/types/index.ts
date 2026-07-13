@@ -383,18 +383,30 @@ export interface Vote {
 
 // ── Assemblies (γενικές συνελεύσεις) ────────────────────────────────────────────
 
+/** Σε ποια ενότητα ανήκει ένα συνημμένο (πρόσκληση/πρακτικά/αποφάσεις/γενικά). */
+export type AssemblySection = 'invitation' | 'minutes' | 'decisions' | 'general'
+
+export interface AssemblyAttachment {
+  url: string
+  name: string
+  path: string
+  section?: AssemblySection // κενό = γενικά (παλαιά έγγραφα)
+}
+
 export interface Assembly {
   id: string
   buildingId: string
   title: string
+  location?: string // μέρος διεξαγωγής
   scheduledAt?: Timestamp
   status: 'planned' | 'held'
   invitation?: string // πρόσκληση / ημερήσια διάταξη
   minutes?: string // πρακτικά
   decisions?: string // αποφάσεις
-  presentWeight?: number // παρόν βάρος χιλιοστών (για απαρτία)
+  presentWeight?: number // παρόν βάρος χιλιοστών (για απαρτία) — υπολογίζεται από τα παρόντα διαμερίσματα
+  presentApartmentIds?: string[] // διαμερίσματα που ήταν παρόντα (τικ)
   totalWeight?: number
-  attachments?: { url: string; name: string; path: string }[]
+  attachments?: AssemblyAttachment[]
   createdBy?: string
   createdAt?: Timestamp
 }

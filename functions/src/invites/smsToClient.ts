@@ -24,8 +24,8 @@ export interface SmsToParams {
 }
 
 export async function sendSmsTo(apiKey: string, params: SmsToParams): Promise<void> {
-  // Το SMS.to δέχεται sender_id μόνο alphanumeric + κενά.
-  const senderId = params.sender.replace(/[^A-Za-z0-9 ]/g, '') || 'Info'
+  // Το SMS.to δέχεται sender_id μόνο alphanumeric + κενά, έως 11 χαρακτήρες.
+  const senderId = (params.sender.replace(/[^A-Za-z0-9 ]/g, '').trim() || 'Info').slice(0, 11)
   const body = {
     message: params.message,
     to: params.to,

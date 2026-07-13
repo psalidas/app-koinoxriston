@@ -89,12 +89,19 @@ firebase deploy --only hosting,firestore:rules,firestore:indexes,storage
 Ώστε κάθε push στο `main` να κάνει deploy μόνο του:
 
 1. **Service account**: Google Cloud Console → IAM & Admin → Service Accounts →
-   Create. Δώσε ρόλους:
-   - *Firebase Hosting Admin*
-   - *Cloud Datastore Index Admin*
-   - *Firebase Rules Admin*
+   Create. Δώσε ρόλους (πλήρης λίστα — επιβεβαιωμένη στην πράξη):
+   - *Firebase Hosting Admin* — hosting deploy
+   - *Firebase Rules Admin* — firestore & storage rules
+   - *Cloud Datastore Index Admin* — firestore composite indexes
+   - *Service Usage Admin* — το firebase-tools ελέγχει/ενεργοποιεί APIs (χωρίς
+     αυτό: `403 serviceusage ... services.get`)
+   - *Firebase Storage Admin* — deploy storage rules / default bucket
    - *Service Account User*
    Μετά → Keys → **Add key → JSON** → κατέβασέ το.
+
+   > ⚠️ Οι 4 «κλασικοί» ρόλοι δεν αρκούν: χωρίς **Service Usage Admin** το deploy
+   > σκάει στο API check, χωρίς **Cloud Datastore Index Admin** στα indexes, και
+   > χωρίς **Firebase Storage Admin** στο storage. Δες `docs/DEPLOYMENT.md`.
 2. **GitHub Secret**: repo → Settings → Secrets and variables → Actions → New
    repository secret, όνομα **`FIREBASE_SERVICE_ACCOUNT`**, τιμή = όλο το JSON.
 3. Άνοιξε το `.github/workflows/deploy.yml` και συμπλήρωσε τα `VITE_FIREBASE_*`

@@ -52,8 +52,17 @@ Google Cloud / Firebase.
 | `npm run preview` | Preview του build |
 | `npm run typecheck` | Μόνο type-check |
 
+## Κατάσταση
+
+**Live:** https://app-koinoxriston.web.app (hosting + firestore rules).
+Εκκρεμούν `firestore:indexes` & `storage` (2 ρόλοι service account) και τα email
+Cloud Functions (Blaze + extension) — δες [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md).
+
 ## Τεκμηρίωση
 
 - [`docs/PROJECT_SPEC.md`](./docs/PROJECT_SPEC.md) — προδιαγραφές & domain
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — stack, μοντέλο δεδομένων, ασφάλεια, μηχανή επιμερισμού
 - [`docs/SETUP.md`](./docs/SETUP.md) — οδηγός Firebase / Google Cloud
-- [`docs/ROADMAP.md`](./docs/ROADMAP.md) — φάσεις υλοποίησης
+- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — runbook deploy, ρόλοι, troubleshooting, τρέχουσα κατάσταση
+- [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) — παρακολούθηση CI/deploy από τον agent
+- [`docs/ROADMAP.md`](./docs/ROADMAP.md) — φάσεις υλοποίησης & κατάσταση

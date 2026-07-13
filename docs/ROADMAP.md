@@ -1,5 +1,12 @@
 # Roadmap
 
+## Κατάσταση deploy
+- ✅ **Live**: https://app-koinoxriston.web.app (hosting + firestore rules)
+- ⏸️ Εκκρεμεί: `firestore:indexes` (ρόλος *Cloud Datastore Index Admin*),
+  `storage` (ρόλος *Firebase Storage Admin* + default bucket), Cloud Functions
+  email (Blaze + extension). Λεπτομέρειες: [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
+
 ## Φάση 1 — MVP διαχειριστή ✅ (τρέχουσα)
 - [x] Scaffold (Vite/React/TS/Tailwind/Firebase), PWA, CI/CD
 - [x] Auth membership-based (Google + email link) + rules

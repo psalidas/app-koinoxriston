@@ -554,6 +554,7 @@ export interface ContactEntry {
   phone: string
   phone2?: string
   email?: string
+  link?: string // ιστότοπος / σύνδεσμος
   note?: string
   createdBy?: string
   createdAt?: Timestamp

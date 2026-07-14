@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Phone, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Phone, Search, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, SelectField, Badge } from '@/components/forms'
@@ -18,8 +18,16 @@ const blankForm = () => ({
   phone: '',
   phone2: '',
   email: '',
+  link: '',
   note: '',
 })
+
+/** Εξασφαλίζει ότι ο σύνδεσμος έχει σχήμα (https://) για σωστό href. */
+function normalizeUrl(u: string): string {
+  const t = u.trim()
+  if (!t) return ''
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`
+}
 
 export default function Contacts() {
   const { building } = useAppData()
@@ -65,7 +73,7 @@ export default function Contacts() {
     if (catFilter !== 'all') list = list.filter((c) => c.category === catFilter)
     if (q) {
       list = list.filter((c) =>
-        [c.name, c.category, c.phone, c.phone2, c.email, c.note]
+        [c.name, c.category, c.phone, c.phone2, c.email, c.link, c.note]
           .filter(Boolean)
           .some((v) => (v as string).toLowerCase().includes(q)),
       )
@@ -102,6 +110,7 @@ export default function Contacts() {
       phone: c.phone ?? '',
       phone2: c.phone2 ?? '',
       email: c.email ?? '',
+      link: c.link ?? '',
       note: c.note ?? '',
     })
     setModalOpen(true)
@@ -118,6 +127,7 @@ export default function Contacts() {
         phone: form.phone.trim(),
         phone2: form.phone2.trim() || undefined,
         email: form.email.trim() || undefined,
+        link: normalizeUrl(form.link) || undefined,
         note: form.note.trim() || undefined,
       }
       if (editing) await updateContact(editing.id, data)
@@ -231,6 +241,16 @@ export default function Contacts() {
                   <td className="px-3 py-2">
                     <div className="font-medium text-gray-900">{c.name}</div>
                     {c.email && <div className="text-xs text-gray-400">{c.email}</div>}
+                    {c.link && (
+                      <a
+                        href={c.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                      >
+                        <ExternalLink size={12} /> Σύνδεσμος
+                      </a>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <Badge color="gray">{c.category}</Badge>
@@ -309,6 +329,14 @@ export default function Contacts() {
           </div>
           <Field label="Email (προαιρετικό)">
             <TextField type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
+          <Field label="Σύνδεσμος (προαιρετικό)" hint="Ιστότοπος ή σελίδα — π.χ. www.example.gr">
+            <TextField
+              type="url"
+              placeholder="https://…"
+              value={form.link}
+              onChange={(e) => setForm({ ...form, link: e.target.value })}
+            />
           </Field>
           <Field label="Σημείωση (προαιρετικό)">
             <textarea

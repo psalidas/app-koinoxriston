@@ -14,6 +14,7 @@ import {
   FileCheck,
   FolderOpen,
   Contact,
+  Phone,
   Hammer,
   Upload,
   Users,
@@ -49,6 +50,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/contracts', label: 'Συμβόλαια', icon: FileCheck },
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/directory', label: 'Κατάλογος', icon: Contact },
+  { to: '/contacts', label: 'Τηλέφωνα', icon: Phone },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
   { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
   { to: '/admin/invites', label: 'Προσκλήσεις', icon: Send, section: 'Διαχείριση' },
@@ -68,6 +70,7 @@ const RESIDENT_NAV: NavItem[] = [
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/directory', label: 'Κατάλογος', icon: Contact },
+  { to: '/contacts', label: 'Τηλέφωνα', icon: Phone },
 ]
 
 export function navFor(isManager: boolean): NavItem[] {

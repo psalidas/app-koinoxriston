@@ -525,6 +525,41 @@ export interface DocEntry {
   createdAt?: Timestamp
 }
 
+// ── Τηλέφωνα / Χρήσιμες επαφές ───────────────────────────────────────────────
+
+/** Κατηγορίες τηλεφωνικού καταλόγου της πολυκατοικίας. */
+export const CONTACT_CATEGORIES = [
+  'Συνεργείο / Τεχνικός',
+  'Ασανσέρ',
+  'Θέρμανση / Καυστήρας',
+  'Υδραυλικός',
+  'Ηλεκτρολόγος',
+  'Καθαριότητα',
+  'Απεντόμωση',
+  'Κεραία / Δορυφορικά',
+  'Πυρασφάλεια',
+  'Έκτακτη ανάγκη',
+  'Δήμος / Υπηρεσίες',
+  'Προμηθευτής',
+  'Άλλο',
+] as const
+
+export type ContactCategory = (typeof CONTACT_CATEGORIES)[number]
+
+export interface ContactEntry {
+  id: string
+  buildingId: string
+  name: string
+  category: string
+  phone: string
+  phone2?: string
+  email?: string
+  note?: string
+  createdBy?: string
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
 // ── Audit log ──────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

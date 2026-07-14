@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, Sparkles } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, Badge } from '@/components/forms'
@@ -10,6 +10,7 @@ import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
 import { uploadReceipt } from '@/lib/upload'
+import { analyzeReceipt } from '@/lib/ocr'
 import { UploadProgress } from '@/components/UploadProgress'
 import { logAudit } from '@/lib/audit'
 import { Paperclip } from 'lucide-react'
@@ -39,6 +40,8 @@ export default function Expenses() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState<number | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>({
     group: 'koinoxrista',
     category: '',
@@ -92,6 +95,35 @@ export default function Expenses() {
       receiptPath: e.receiptPath,
     })
     setModalOpen(true)
+  }
+
+  async function analyze() {
+    if (!file) return
+    setAiBusy(true)
+    setAiMsg(null)
+    try {
+      const res = await analyzeReceipt(file)
+      setForm((f) => ({
+        ...f,
+        amount: res.amount ?? f.amount,
+        category: res.category || res.merchant || f.category,
+        note: f.note || [res.merchant, res.date].filter(Boolean).join(' · '),
+      }))
+      const got = [
+        res.amount != null ? 'ποσό' : null,
+        res.category ? 'κατηγορία' : null,
+        res.merchant ? 'προμηθευτής' : null,
+      ].filter(Boolean)
+      setAiMsg(
+        got.length
+          ? `Συμπληρώθηκαν: ${got.join(', ')}. Έλεγξε & διόρθωσε αν χρειάζεται.`
+          : 'Δεν αναγνωρίστηκαν πεδία από το παραστατικό.',
+      )
+    } catch (e) {
+      setAiMsg('Αποτυχία ανάλυσης: ' + (e as Error).message)
+    } finally {
+      setAiBusy(false)
+    }
   }
 
   async function save() {
@@ -329,9 +361,21 @@ export default function Expenses() {
             <input
               type="file"
               accept="image/*,application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null)
+                setAiMsg(null)
+              }}
               className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
+            {file && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button variant="secondary" onClick={analyze} disabled={aiBusy}>
+                  <Sparkles size={16} /> {aiBusy ? 'Ανάλυση…' : 'Ανάλυση AI'}
+                </Button>
+                <span className="text-xs text-gray-500">Αυτόματη συμπλήρωση φόρμας από το παραστατικό</span>
+              </div>
+            )}
+            {aiMsg && <p className="mt-1 text-xs text-gray-500">{aiMsg}</p>}
             <UploadProgress value={uploadPct} />
             {form.receiptUrl && !file && (
               <a

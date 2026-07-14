@@ -31,6 +31,8 @@ export { redeemMagicLink } from './magic/redeem'
 // env: ANTHROPIC_API_KEY (GitHub Secret → CI).
 export { ocrReceipt } from './expenses/ocrReceipt'
 
+import { loadInviteConfig } from './invites/send'
+
 interface UserDoc {
   name?: string
   role?: string
@@ -58,13 +60,28 @@ async function buildingUsers(buildingId: string): Promise<{ id: string; data: Us
   return snap.docs.map((d) => ({ id: d.id, data: d.data() as UserDoc }))
 }
 
+/** CC (κοινοποίηση) σε κάθε εξερχόμενο email — από τις Ρυθμίσεις προσκλήσεων. */
+async function outgoingCc(): Promise<string> {
+  try {
+    return (await loadInviteConfig(db)).ccEmail
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Enqueue an email for the `firestore-send-email` extension, which watches the
  * `mail` collection and sends via the configured SMTP provider.
  */
-async function enqueueMail(to: string[], subject: string, html: string): Promise<void> {
+async function enqueueMail(to: string[], subject: string, html: string, cc?: string): Promise<void> {
   if (to.length === 0) return
-  await db.collection('mail').add({ to, message: { subject, html } })
+  const message: Record<string, unknown> = { subject, html }
+  const ccAddr = cc?.trim()
+  // Μην κοινοποιείς αν ο μοναδικός παραλήπτης είναι ο ίδιος ο CC.
+  if (ccAddr && !(to.length === 1 && to[0].toLowerCase() === ccAddr.toLowerCase())) {
+    message.cc = ccAddr
+  }
+  await db.collection('mail').add({ to, message })
 }
 
 /** New announcement → email all active users of the building with an address. */
@@ -74,7 +91,7 @@ export const onAnnouncementCreated = onDocumentCreated('announcements/{id}', asy
   const users = await buildingUsers(ann.buildingId as string)
   const to = users.filter((u) => u.data.active !== false && isEmail(u.id)).map((u) => u.id)
   const html = `<h2>${escapeHtml(ann.title)}</h2><p>${escapeHtml(ann.body || '').replace(/\n/g, '<br>')}</p>`
-  await enqueueMail(to, `Ανακοίνωση: ${ann.title}`, html)
+  await enqueueMail(to, `Ανακοίνωση: ${ann.title}`, html, await outgoingCc())
 })
 
 /** New poll → notify eligible users that a vote has opened. */
@@ -86,7 +103,7 @@ export const onPollCreated = onDocumentCreated('polls/{id}', async (event) => {
   const html =
     `<h2>Νέα ψηφοφορία</h2><p>${escapeHtml(poll.question || '')}</p>` +
     `<p>Ψηφίστε στην εφαρμογή.</p>`
-  await enqueueMail(to, `Ψηφοφορία: ${poll.question}`, html)
+  await enqueueMail(to, `Ψηφοφορία: ${poll.question}`, html, await outgoingCc())
 })
 
 /** Statement issued (draft → issued) → email each owner/resident their amount. */
@@ -99,6 +116,7 @@ export const onStatementIssued = onDocumentUpdated('statements/{id}', async (eve
   const users = await buildingUsers(after.buildingId as string)
   const rows: StatementRow[] = (after.rows as StatementRow[]) || []
   const periodLabel = (after.periodLabel as string) || (after.period as string)
+  const cc = await outgoingCc()
 
   for (const u of users) {
     if (u.data.active === false || !isEmail(u.id)) continue
@@ -111,6 +129,6 @@ export const onStatementIssued = onDocumentUpdated('statements/{id}', async (eve
       `<p>Εκδόθηκαν τα κοινόχρηστα για την περίοδο <b>${escapeHtml(periodLabel)}</b>.</p>` +
       `<p>${lines}</p><p><b>Πληρωτέο σύνολο: ${total.toFixed(2)} €</b></p>` +
       `<p>Δείτε το ειδοποιητήριο στην εφαρμογή.</p>`
-    await enqueueMail([u.id], `Κοινόχρηστα ${periodLabel}`, html)
+    await enqueueMail([u.id], `Κοινόχρηστα ${periodLabel}`, html, cc)
   }
 })

@@ -53,6 +53,7 @@ export default function InviteSettingsPage() {
         fromEmail: form.fromEmail.trim(),
         fromName: form.fromName.trim(),
         smsSender: form.smsSender.trim(),
+        ccEmail: form.ccEmail.trim(),
       })
       await logAudit({
         userEmail: user?.email ?? '',
@@ -124,6 +125,18 @@ export default function InviteSettingsPage() {
               value={form.smsSender}
               maxLength={11}
               onChange={(e) => set('smsSender', e.target.value.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 11))}
+            />
+          </Field>
+
+          <Field
+            label="Κοινοποίηση (CC) σε κάθε email"
+            hint="Κάθε εξερχόμενο email (προσκλήσεις, μαζικά, ανακοινώσεις, κοινόχρηστα) κοινοποιείται εδώ. Άφησέ το κενό για κανένα CC."
+          >
+            <TextField
+              type="email"
+              placeholder="π.χ. michael@crowdpolicy.com"
+              value={form.ccEmail}
+              onChange={(e) => set('ccEmail', e.target.value)}
             />
           </Field>
         </div>

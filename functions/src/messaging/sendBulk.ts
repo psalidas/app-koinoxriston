@@ -109,6 +109,7 @@ export const sendBulkMessage = onCall(
             html,
             fromEmail: cfg.fromEmail,
             fromName: cfg.fromName,
+            cc: cfg.ccEmail,
           })
         } else {
           const phoneRaw = isPhone(id) ? id : typeof data.phone === 'string' && isPhone(data.phone) ? data.phone : ''

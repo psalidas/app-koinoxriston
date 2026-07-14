@@ -18,14 +18,20 @@ export interface BrevoEmailParams {
   html: string
   fromEmail: string
   fromName: string
+  /** Προαιρετικό CC — δεν προστίθεται αν ταυτίζεται με τον παραλήπτη. */
+  cc?: string
 }
 
 export async function sendBrevoEmail(apiKey: string, params: BrevoEmailParams): Promise<void> {
-  const body = {
+  const body: Record<string, unknown> = {
     sender: { email: params.fromEmail, name: params.fromName },
     to: [params.toName ? { email: params.toEmail, name: params.toName } : { email: params.toEmail }],
     subject: params.subject,
     htmlContent: params.html,
+  }
+  const cc = params.cc?.trim()
+  if (cc && cc.toLowerCase() !== params.toEmail.trim().toLowerCase()) {
+    body.cc = [{ email: cc }]
   }
 
   let resp: Response

@@ -40,6 +40,7 @@ export const sendTestInvite = onCall(
             '<p>Αν το βλέπετε, η ρύθμιση email (Brevo) λειτουργεί. ✅</p>',
           fromEmail: cfg.fromEmail,
           fromName: cfg.fromName,
+          cc: cfg.ccEmail,
         })
         return { ok: true, channel: 'email' }
       }

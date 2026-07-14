@@ -59,11 +59,11 @@ const RESIDENT_NAV: NavItem[] = [
   { to: '/portal', label: 'Πίνακας ελέγχου', icon: LayoutDashboard },
   { to: '/my-profile', label: 'Τα στοιχεία μου', icon: IdCard },
   { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
+  { to: '/works', label: 'Εργασίες', icon: Hammer },
   { to: '/topics', label: 'Συζήτηση', icon: MessagesSquare },
   { to: '/polls', label: 'Ψηφοφορίες', icon: Vote },
   { to: '/assemblies', label: 'Συνελεύσεις', icon: Gavel },
   { to: '/tickets', label: 'Βλάβες / Αιτήματα', icon: Wrench },
-  { to: '/works', label: 'Εργασίες', icon: Hammer },
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/directory', label: 'Κατάλογος', icon: Contact },
 ]

@@ -4,13 +4,13 @@ import crowdpolicy from '@/assets/logos/crowdpolicy.png'
 const GFC_URL = 'https://fintech.net.gr/el/'
 const CP_URL = 'https://www.crowdpolicy.com/el/'
 
-/** Υποσέλιδο branding — εμφανίζεται στην πλατφόρμα & στις εκτυπώσεις. */
+/** Υποσέλιδο branding — μία ευθεία (inline), εμφανίζεται στην πλατφόρμα &
+ *  στις εκτυπώσεις. Χρήση inline στοιχείων (αντί flex) για αξιόπιστη
+ *  απόδοση στη μηχανή εκτύπωσης. */
 export function Footer({ className = '' }: { className?: string }) {
   return (
-    <div
-      className={`flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap py-3 text-[11px] text-gray-400 ${className}`}
-    >
-      <span>
+    <div className={`whitespace-nowrap py-3 text-center text-[11px] text-gray-400 ${className}`}>
+      <span className="align-middle">
         Powered by{' '}
         <a href={GFC_URL} target="_blank" rel="noreferrer" className="hover:text-gray-600 hover:underline">
           Greek Fintech Cluster
@@ -20,11 +20,11 @@ export function Footer({ className = '' }: { className?: string }) {
           Crowdpolicy Group
         </a>
       </span>
-      <a href={GFC_URL} target="_blank" rel="noreferrer" className="shrink-0">
-        <img src={gfc} alt="Greek Fintech Cluster" className="h-4 w-auto shrink-0 opacity-70" />
+      <a href={GFC_URL} target="_blank" rel="noreferrer">
+        <img src={gfc} alt="Greek Fintech Cluster" className="ml-2 inline h-4 w-auto align-middle opacity-70" />
       </a>
-      <a href={CP_URL} target="_blank" rel="noreferrer" className="shrink-0">
-        <img src={crowdpolicy} alt="Crowdpolicy" className="h-4 w-auto shrink-0 opacity-70" />
+      <a href={CP_URL} target="_blank" rel="noreferrer">
+        <img src={crowdpolicy} alt="Crowdpolicy" className="ml-1 inline h-4 w-auto align-middle opacity-70" />
       </a>
     </div>
   )

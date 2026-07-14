@@ -23,6 +23,9 @@ import type { Role, UserDoc } from '@/types'
 
 const BOOTSTRAP_ADMIN = 'michael@crowdpolicy.com'
 
+/** Γιατί δεν βρέθηκε προφίλ — για διάγνωση στην οθόνη «Δεν έχετε πρόσβαση». */
+type ProfileReason = 'ok' | 'not-found' | 'denied' | 'error'
+
 interface AuthState {
   loading: boolean
   user: User | null
@@ -31,6 +34,10 @@ interface AuthState {
   hasAccess: boolean
   role: Role | null
   isManager: boolean
+  /** Το αναγνωριστικό που χρησιμοποιήθηκε για το lookup (email/κινητό). */
+  authIdentifier: string | null
+  /** Αποτέλεσμα ανάγνωσης του /users doc (διάγνωση). */
+  authReason: ProfileReason
 }
 
 interface AuthContextValue extends AuthState {
@@ -45,14 +52,6 @@ interface AuthContextValue extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-
-/** The membership doc id: email when present, else the phone number. */
-async function loadProfile(identifier: string | null): Promise<UserDoc | null> {
-  if (!identifier || !db) return null
-  const snap = await getDoc(doc(db, 'users', identifier))
-  if (!snap.exists()) return null
-  return { email: identifier, ...(snap.data() as Omit<UserDoc, 'email'>) }
-}
 
 /** Ανθρώπινη περιγραφή τρόπου εισόδου (Google / κωδικός / σύνδεσμος). */
 function loginMethod(user: User): string {
@@ -93,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasAccess: false,
     role: null,
     isManager: false,
+    authIdentifier: null,
+    authReason: 'ok',
   })
 
   useEffect(() => {
@@ -111,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             hasAccess: false,
             role: null,
             isManager: false,
+            authIdentifier: null,
+            authReason: 'ok',
           })
           return
         }
@@ -131,17 +134,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         identifier = identifier ? normalizeIdentifier(identifier) : identifier
         // Ποτέ να μη μείνει η εφαρμογή στο «Φόρτωση…» αν αποτύχει το read.
         let profile: UserDoc | null = null
-        try {
-          profile = await loadProfile(identifier)
-        } catch (err) {
-          console.error('loadProfile failed', err)
+        let reason: ProfileReason = 'ok'
+        if (!identifier || !db) {
+          reason = 'error'
+        } else {
+          try {
+            const snap = await getDoc(doc(db, 'users', identifier))
+            if (snap.exists()) {
+              profile = { email: identifier, ...(snap.data() as Omit<UserDoc, 'email'>) }
+            } else {
+              reason = 'not-found'
+            }
+          } catch (err) {
+            const code = (err as { code?: string })?.code ?? ''
+            reason =
+              code.includes('permission-denied') || String(err).toLowerCase().includes('insufficient')
+                ? 'denied'
+                : 'error'
+            console.error('loadProfile failed', code || err)
+          }
         }
         const isBootstrap = user.email === BOOTSTRAP_ADMIN
         const role: Role | null = profile?.role ?? (isBootstrap ? 'admin' : null)
         const hasAccess = isBootstrap || (!!profile && profile.active !== false)
         const isManager =
           isBootstrap || role === 'admin' || role === 'manager'
-        setState({ loading: false, user, profile, hasAccess, role, isManager })
+        setState({
+          loading: false,
+          user,
+          profile,
+          hasAccess,
+          role,
+          isManager,
+          authIdentifier: identifier ?? null,
+          authReason: reason,
+        })
         if (hasAccess) logLoginOnce(user, identifier, profile)
       } catch (err) {
         console.error('auth state handler failed', err)

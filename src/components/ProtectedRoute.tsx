@@ -10,7 +10,7 @@ export function ProtectedRoute({
   children: ReactNode
   managerOnly?: boolean
 }) {
-  const { loading, user, hasAccess, isManager, signOut } = useAuth()
+  const { loading, user, hasAccess, isManager, signOut, authIdentifier, authReason } = useAuth()
 
   if (loading) {
     return (
@@ -33,6 +33,21 @@ export function ProtectedRoute({
         {user.email && (
           <p className="text-xs text-gray-400">Συνδεδεμένος ως {user.email}</p>
         )}
+        <div className="mt-1 rounded-md bg-gray-50 px-3 py-2 text-left text-[11px] leading-relaxed text-gray-400">
+          <div>Αναγνωριστικό ελέγχου: <span className="font-mono text-gray-600">{authIdentifier || '—'}</span></div>
+          <div>
+            Κατάσταση:{' '}
+            <span className="font-mono text-gray-600">
+              {authReason === 'not-found'
+                ? 'δεν βρέθηκε λογαριασμός με αυτό το αναγνωριστικό'
+                : authReason === 'denied'
+                ? 'άρνηση ανάγνωσης (δικαιώματα)'
+                : authReason === 'error'
+                ? 'σφάλμα ανάγνωσης'
+                : 'ανενεργός λογαριασμός'}
+            </span>
+          </div>
+        </div>
         <Button variant="secondary" onClick={() => void signOut()} className="mt-2">
           Αποσύνδεση / Δοκιμή άλλου λογαριασμού
         </Button>

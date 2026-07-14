@@ -18,6 +18,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { requestMagicLink } from './magic'
 import { normalizeIdentifier } from './format'
+import { logAudit } from './audit'
 import type { Role, UserDoc } from '@/types'
 
 const BOOTSTRAP_ADMIN = 'michael@crowdpolicy.com'
@@ -51,6 +52,37 @@ async function loadProfile(identifier: string | null): Promise<UserDoc | null> {
   const snap = await getDoc(doc(db, 'users', identifier))
   if (!snap.exists()) return null
   return { email: identifier, ...(snap.data() as Omit<UserDoc, 'email'>) }
+}
+
+/** Ανθρώπινη περιγραφή τρόπου εισόδου (Google / κωδικός / σύνδεσμος). */
+function loginMethod(user: User): string {
+  const pid = user.providerData[0]?.providerId
+  if (pid === 'google.com') return 'Google'
+  if (pid === 'password') return 'κωδικός'
+  // custom token (magic link) → δεν υπάρχει providerData
+  return 'σύνδεσμος'
+}
+
+/**
+ * Καταγράφει μία «είσοδο» ανά συνεδρία περιηγητή (sessionStorage), ώστε τα
+ * reload να μην δημιουργούν διπλές εγγραφές. Best-effort — δεν ρίχνει ποτέ.
+ */
+function logLoginOnce(user: User, identifier: string | null, profile: UserDoc | null) {
+  try {
+    const key = `audit-login-${user.uid}`
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+    void logAudit({
+      buildingId: profile?.buildingIds?.[0],
+      userEmail: identifier ?? user.email ?? user.uid,
+      userName: profile?.name ?? user.email ?? '',
+      action: 'login',
+      entity: 'session',
+      entityId: loginMethod(user),
+    })
+  } catch {
+    // sessionStorage μη διαθέσιμο — αγνόησε
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -110,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const isManager =
           isBootstrap || role === 'admin' || role === 'manager'
         setState({ loading: false, user, profile, hasAccess, role, isManager })
+        if (hasAccess) logLoginOnce(user, identifier, profile)
       } catch (err) {
         console.error('auth state handler failed', err)
         setState((s) => ({ ...s, loading: false }))
@@ -140,6 +173,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     if (!auth) return
+    try {
+      const uid = auth.currentUser?.uid
+      if (uid) sessionStorage.removeItem(`audit-login-${uid}`)
+    } catch {
+      // αγνόησε
+    }
     await fbSignOut(auth)
   }
 

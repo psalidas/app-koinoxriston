@@ -206,10 +206,11 @@ service cloud.firestore {
       allow write: if isManager() || (isAuthed() && uid() == id);
     }
 
-    // Audit log — managers read; writes happen from trusted context only.
+    // Audit log — managers read· κάθε γνωστός χρήστης καταγράφει μόνο δικές του
+    // ενέργειες (π.χ. login), με userEmail == το δικό του αναγνωριστικό.
     match /auditLogs/{id} {
       allow read: if isManager();
-      allow create: if isManager();
+      allow create: if isKnownUser() && request.resource.data.userEmail == uid();
       allow update, delete: if false;
     }
   }

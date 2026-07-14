@@ -21,12 +21,18 @@ service cloud.firestore {
     // Membership identifier. Οι magic-link συνεδρίες φέρουν custom claim
     // `identifier` (= το id του /users doc) ώστε να ταυτοποιούνται αξιόπιστα
     // email & κινητό. Αλλιώς email, αλλιώς αριθμός τηλεφώνου.
+    //
+    // ΣΗΜΑΝΤΙΚΟ: ελέγχουμε την ύπαρξη του claim με `in` ΠΡΙΝ την προσπελάσουμε.
+    // Η απευθείας προσπέλαση ανύπαρκτου custom claim (π.χ. `identifier` σε
+    // σύνδεση Google) κάνει την αποτίμηση του κανόνα να αποτύχει → άρνηση.
     function uid() {
-      return request.auth.token.identifier != null
+      return ('identifier' in request.auth.token && request.auth.token.identifier != null)
         ? request.auth.token.identifier
-        : request.auth.token.email != null
+        : ('email' in request.auth.token && request.auth.token.email != null)
         ? request.auth.token.email
-        : request.auth.token.phone_number;
+        : ('phone_number' in request.auth.token && request.auth.token.phone_number != null)
+        ? request.auth.token.phone_number
+        : null;
     }
 
     function isBootstrapAdmin() {

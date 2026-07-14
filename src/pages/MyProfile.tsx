@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Save, X } from 'lucide-react'
+import { Pencil, Save, X, Building2 } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Card, PageHeader, Field, TextField, Button, Toggle } from '@/components/forms'
+import { mille } from '@/lib/format'
 import type { ContactVisibility } from '@/types'
 import { getProfile, saveContact } from '@/lib/repos/directory'
 
@@ -20,8 +21,18 @@ const FIELDS: { key: keyof Contact; visKey: keyof ContactVisibility; label: stri
 
 export default function MyProfile() {
   const { profile } = useAuth()
-  const { apartments } = useAppData()
+  const { building, apartments } = useAppData()
   const identifier = profile?.email ?? ''
+
+  // Ιδιοκτησία & χιλιοστά — μόνο για ιδιοκτήτες/ενοίκους με διαμερίσματα.
+  const isOwnerOrResident = profile?.role === 'owner' || profile?.role === 'resident'
+  const myApartments = useMemo(() => {
+    const ids = profile?.apartmentIds ?? []
+    return apartments
+      .filter((a) => ids.includes(a.id))
+      .sort((a, b) => a.orderNo - b.orderNo)
+  }, [apartments, profile])
+  const scales = building?.scales ?? []
 
   const [contact, setContact] = useState<Contact>(EMPTY)
   const [visibility, setVisibility] = useState<ContactVisibility>({})
@@ -109,8 +120,38 @@ export default function MyProfile() {
 
       {msg && <div className="mb-3 rounded-md bg-green-50 p-2 text-sm text-green-700">{msg}</div>}
 
+      {isOwnerOrResident && myApartments.length > 0 && (
+        <Card className="mb-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <Building2 size={16} /> Η ιδιοκτησία μου & χιλιοστά
+          </h2>
+          <div className="space-y-4">
+            {myApartments.map((a) => (
+              <div key={a.id}>
+                <div className="mb-1 flex items-baseline justify-between">
+                  <span className="font-medium text-gray-900">
+                    Διαμέρισμα {a.code}
+                    {a.floor ? ` · ${a.floor}` : ''}
+                  </span>
+                  <span className="text-xs text-gray-500">{a.ownerName}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
+                  {scales.map((s) => (
+                    <div key={s.key} className="flex justify-between">
+                      <span className="text-gray-500">{s.label}</span>
+                      <span className="tnum font-medium">{mille(a.millesimes?.[s.key] ?? 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
-        <p className="mb-4 text-xs text-gray-500">
+        <h2 className="mb-1 text-sm font-semibold text-gray-700">Στοιχεία επικοινωνίας</h2>
+        <p className="mb-4 mt-1 text-xs text-gray-500">
           Ο διακόπτης «Ορατό» καθορίζει αν το πεδίο εμφανίζεται στον εσωτερικό{' '}
           <Link to="/directory" className="text-blue-600 hover:underline">κατάλογο</Link>. Ο
           διαχειριστής βλέπει πάντα όλα τα στοιχεία.

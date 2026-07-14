@@ -29,6 +29,7 @@ import Assemblies from './pages/Assemblies'
 import AssemblyView from './pages/AssemblyView'
 import Documents from './pages/Documents'
 import Directory from './pages/Directory'
+import Works from './pages/Works'
 import Users from './pages/admin/Users'
 import AuditLog from './pages/admin/AuditLog'
 import BuildingSettings from './pages/admin/BuildingSettings'
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/assemblies/:id" element={<AssemblyView />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/directory" element={<Directory />} />
+        <Route path="/works" element={<Works />} />
         <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
 
         {/* Manager-only */}

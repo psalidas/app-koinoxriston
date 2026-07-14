@@ -110,6 +110,13 @@ export default function Users() {
     await load()
   }
 
+  // Ένδειξη καναλιού πρόσκλησης με βάση το αναγνωριστικό (νέος χρήστης).
+  const inviteChannelHint = (() => {
+    const id = form.email.trim()
+    if (!id) return 'email ή SMS'
+    return id.includes('@') ? 'email' : 'SMS'
+  })()
+
   return (
     <div>
       <PageHeader
@@ -268,6 +275,19 @@ export default function Users() {
                   ))}
               </div>
             </div>
+
+          {!editing && (
+            <div className="flex items-start gap-2 rounded-md bg-blue-50 p-2.5 text-xs text-blue-700">
+              <Send size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {form.active ? (
+                  <>Με την αποθήκευση θα σταλεί αυτόματα <b>πρόσκληση εισόδου με {inviteChannelHint}</b> (εφόσον οι αυτόματες προσκλήσεις είναι ενεργές).</>
+                ) : (
+                  <>Ο λογαριασμός είναι <b>ανενεργός</b> — δεν θα σταλεί πρόσκληση. Ενεργοποίησέ τον για αυτόματη αποστολή.</>
+                )}
+              </span>
+            </div>
+          )}
         </div>
       </Modal>
 

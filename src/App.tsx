@@ -30,10 +30,12 @@ import AssemblyView from './pages/AssemblyView'
 import Documents from './pages/Documents'
 import Directory from './pages/Directory'
 import Works from './pages/Works'
+import Contacts from './pages/Contacts'
 import Users from './pages/admin/Users'
 import AuditLog from './pages/admin/AuditLog'
 import BuildingSettings from './pages/admin/BuildingSettings'
 import InviteSettings from './pages/admin/InviteSettings'
+import Broadcast from './pages/admin/Broadcast'
 
 export default function App() {
   return (
@@ -61,6 +63,7 @@ export default function App() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/directory" element={<Directory />} />
         <Route path="/works" element={<Works />} />
+        <Route path="/contacts" element={<Contacts />} />
         <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
 
         {/* Manager-only */}
@@ -79,6 +82,7 @@ export default function App() {
           <Route path="/import" element={<ImportExport />} />
           <Route path="/admin/users" element={<Users />} />
           <Route path="/admin/invites" element={<InviteSettings />} />
+          <Route path="/admin/broadcast" element={<Broadcast />} />
           <Route path="/admin/audit" element={<AuditLog />} />
           <Route path="/admin/settings" element={<BuildingSettings />} />
         </Route>

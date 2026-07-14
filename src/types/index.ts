@@ -460,6 +460,45 @@ export interface DirectoryEntry {
   updatedAt?: Timestamp
 }
 
+// ── Works / εργασίες πολυκατοικίας ───────────────────────────────────────────────
+
+export type WorkStatus = 'todo' | 'in_progress' | 'done'
+
+export const WORK_STATUS_LABELS: Record<WorkStatus, string> = {
+  todo: 'Προς υλοποίηση',
+  in_progress: 'Σε υλοποίηση',
+  done: 'Ολοκληρωμένες',
+}
+
+export const WORK_STATUS_ORDER: WorkStatus[] = ['todo', 'in_progress', 'done']
+
+export const WORK_CATEGORIES = [
+  'Συντήρηση',
+  'Επισκευή',
+  'Ανακαίνιση',
+  'Καθαριότητα',
+  'Ασφάλεια',
+  'Άλλο',
+]
+
+export interface WorkTask {
+  id: string
+  buildingId: string
+  title: string
+  description?: string
+  status: WorkStatus
+  category?: string
+  vendor?: string // ανάδοχος / συνεργείο
+  cost?: number
+  startDate?: Timestamp
+  endDate?: Timestamp
+  attachments?: { url: string; name: string; path: string }[] // προσφορές / αρχεία
+  createdBy?: string
+  createdByName?: string
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
 // ── Documents (έγγραφα πολυκατοικίας, με φακέλους) ───────────────────────────────
 
 export interface DocEntry {

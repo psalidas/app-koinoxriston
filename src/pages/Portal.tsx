@@ -4,7 +4,7 @@ import { Home, Megaphone, ChevronRight, Receipt } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Card, PageHeader, Badge } from '@/components/forms'
-import { money, mille, formatPeriod, formatDate } from '@/lib/format'
+import { money, formatPeriod, formatDate } from '@/lib/format'
 import type { Announcement, Payment, Statement } from '@/types'
 import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
@@ -15,8 +15,6 @@ interface AptView {
   id: string
   code: string
   ownerName: string
-  floor?: string
-  millesimes: { label: string; value: number }[]
   balance: number
   rows: LedgerRow[]
   statements: Statement[]
@@ -50,11 +48,6 @@ export default function Portal() {
               id: a.id,
               code: a.code,
               ownerName: a.ownerName,
-              floor: a.floor,
-              millesimes: (building.scales ?? []).map((s) => ({
-                label: s.label,
-                value: a.millesimes?.[s.key] ?? 0,
-              })),
               balance,
               rows,
               statements: issued.filter((s) => s.rows.some((r) => r.apartmentId === a.id)),
@@ -103,26 +96,6 @@ export default function Portal() {
                   <div className="tnum text-xl font-bold">{money(v.balance)}</div>
                 </div>
               </div>
-
-              {(v.floor || v.millesimes.length > 0) && (
-                <Card className="mb-3">
-                  <h3 className="mb-2 text-sm font-semibold text-gray-700">Ιδιοκτησία & χιλιοστά</h3>
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
-                    {v.floor && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Όροφος</span>
-                        <span className="font-medium">{v.floor}</span>
-                      </div>
-                    )}
-                    {v.millesimes.map((m) => (
-                      <div key={m.label} className="flex justify-between">
-                        <span className="text-gray-500">{m.label}</span>
-                        <span className="tnum font-medium">{mille(m.value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
 
               <div className="grid gap-3 lg:grid-cols-2">
                 <Card className="p-0">

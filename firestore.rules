@@ -118,6 +118,12 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    // Works (εργασίες) — known users read, managers write.
+    match /works/{id} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
+
     // Mail queue for the firestore-send-email extension — written only from
     // trusted Cloud Functions (admin SDK bypasses rules). Deny all clients.
     match /mail/{id} {

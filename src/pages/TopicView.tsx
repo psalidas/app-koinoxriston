@@ -20,6 +20,7 @@ import {
 } from '@/lib/repos/topics'
 import { uploadReceipt } from '@/lib/upload'
 import { UploadProgress } from '@/components/UploadProgress'
+import { logAudit } from '@/lib/audit'
 
 export default function TopicView() {
   const { id } = useParams()
@@ -60,6 +61,14 @@ export default function TopicView() {
       authorName,
       createdBy: user?.email ?? undefined,
     })
+    await logAudit({
+      buildingId: building.id,
+      userEmail: profile?.email ?? user?.email ?? '',
+      userName: authorName,
+      action: 'create',
+      entity: 'comment',
+      entityId: topic?.title ?? id,
+    })
     setText('')
     await load()
   }
@@ -83,6 +92,14 @@ export default function TopicView() {
         authorName,
         createdBy: user?.email ?? undefined,
         ...f,
+      })
+      await logAudit({
+        buildingId: building.id,
+        userEmail: profile?.email ?? user?.email ?? '',
+        userName: authorName,
+        action: 'create',
+        entity: 'offer',
+        entityId: offerForm.vendor.trim() || (topic?.title ?? id),
       })
       setOfferForm({ vendor: '', amount: 0, description: '' })
       setOfferFile(null)

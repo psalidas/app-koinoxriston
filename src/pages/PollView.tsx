@@ -17,6 +17,7 @@ import {
   voterWeight,
   tallyVotes,
 } from '@/lib/repos/polls'
+import { logAudit } from '@/lib/audit'
 
 export default function PollView() {
   const { id } = useParams()
@@ -68,6 +69,14 @@ export default function PollView() {
         option: choice,
         weight: myWeight,
         apartmentIds: myApartments.map((a) => a.id),
+      })
+      await logAudit({
+        buildingId: building.id,
+        userEmail: voterId,
+        userName: profile?.name ?? voterId,
+        action: 'vote',
+        entity: 'poll',
+        entityId: poll.question,
       })
       await load()
     } finally {

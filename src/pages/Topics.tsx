@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal'
 import { formatDate } from '@/lib/format'
 import type { Topic } from '@/types'
 import { listTopics, createTopic } from '@/lib/repos/topics'
+import { logAudit } from '@/lib/audit'
 
 export default function Topics() {
   const { building } = useAppData()
@@ -34,6 +35,14 @@ export default function Topics() {
       body: form.body.trim(),
       authorName: profile?.name ?? user?.email ?? 'Χρήστης',
       createdBy: user?.email ?? undefined,
+    })
+    await logAudit({
+      buildingId: building.id,
+      userEmail: profile?.email ?? user?.email ?? '',
+      userName: profile?.name ?? user?.email ?? '',
+      action: 'create',
+      entity: 'topic',
+      entityId: form.title.trim(),
     })
     setForm({ title: '', body: '' })
     setModalOpen(false)

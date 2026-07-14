@@ -293,6 +293,9 @@ export default function Broadcast() {
 
       <ConfirmDialog
         open={confirmOpen}
+        title="Επιβεβαίωση αποστολής"
+        confirmLabel="Αποστολή"
+        confirmVariant="primary"
         message={`Αποστολή ${channel === 'email' ? 'email' : 'SMS'} σε ${recipientIds.length} ${
           recipientIds.length === 1 ? 'παραλήπτη' : 'παραλήπτες'
         }${building ? ` (${building.name})` : ''};`}

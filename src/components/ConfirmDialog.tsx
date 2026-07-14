@@ -6,6 +6,7 @@ export function ConfirmDialog({
   title = 'Επιβεβαίωση',
   message,
   confirmLabel = 'Διαγραφή',
+  confirmVariant = 'danger',
   onConfirm,
   onCancel,
 }: {
@@ -13,6 +14,7 @@ export function ConfirmDialog({
   title?: string
   message: string
   confirmLabel?: string
+  confirmVariant?: 'primary' | 'danger'
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -26,7 +28,7 @@ export function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel}>
             Ακύρωση
           </Button>
-          <Button variant="danger" onClick={onConfirm}>
+          <Button variant={confirmVariant} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

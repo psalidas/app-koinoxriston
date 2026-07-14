@@ -32,6 +32,7 @@ export interface InviteSettings {
   fromEmail: string // πρέπει να είναι verified sender στο Brevo
   fromName: string
   smsSender: string // alphanumeric ≤11 χαρ.
+  ccEmail: string // CC σε κάθε εξερχόμενο email (κενό = χωρίς CC)
 }
 
 // ── Buildings, apartments, people ────────────────────────────────────────────

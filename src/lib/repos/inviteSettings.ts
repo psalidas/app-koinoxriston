@@ -8,6 +8,7 @@ export const DEFAULT_INVITE_SETTINGS: InviteSettings = {
   fromEmail: '',
   fromName: 'Διαχείριση Πολυκατοικίας',
   smsSender: 'Diaxeirisi',
+  ccEmail: 'michael@crowdpolicy.com',
 }
 
 export async function getInviteSettings(): Promise<InviteSettings> {

@@ -20,6 +20,9 @@ const INVITE_TTL_MIN = 60 * 24 * 7 // ο σύνδεσμος πρόσκλησης
 export const DEFAULT_APP_URL = 'https://app-koinoxriston.web.app'
 const DEFAULT_FROM_NAME = 'Διαχείριση Πολυκατοικίας'
 const DEFAULT_SMS_SENDER = 'Diaxeirisi' // ≤11 λατινικά (όριο sms.to)
+// Προεπιλεγμένο CC σε κάθε εξερχόμενο email (μπορεί να αλλάξει από τις
+// Ρυθμίσεις προσκλήσεων· κενή τιμή = χωρίς CC).
+export const DEFAULT_CC_EMAIL = 'michael@crowdpolicy.com'
 
 export interface InviteConfig {
   enabled: boolean
@@ -27,6 +30,7 @@ export interface InviteConfig {
   fromEmail: string
   fromName: string
   smsSender: string
+  ccEmail: string
 }
 
 export async function loadInviteConfig(db: FirebaseFirestore.Firestore): Promise<InviteConfig> {
@@ -41,6 +45,8 @@ export async function loadInviteConfig(db: FirebaseFirestore.Firestore): Promise
       fromEmail: typeof d.fromEmail === 'string' ? d.fromEmail.trim() : '',
       fromName: str(d.fromName, DEFAULT_FROM_NAME),
       smsSender: str(d.smsSender, DEFAULT_SMS_SENDER),
+      // Αν το πεδίο λείπει → προεπιλογή· αν είναι ρητά κενό → χωρίς CC.
+      ccEmail: typeof d.ccEmail === 'string' ? d.ccEmail.trim() : DEFAULT_CC_EMAIL,
     }
   } catch {
     return {
@@ -49,6 +55,7 @@ export async function loadInviteConfig(db: FirebaseFirestore.Firestore): Promise
       fromEmail: '',
       fromName: DEFAULT_FROM_NAME,
       smsSender: DEFAULT_SMS_SENDER,
+      ccEmail: DEFAULT_CC_EMAIL,
     }
   }
 }
@@ -98,6 +105,7 @@ export async function sendInvite(
       html,
       fromEmail: cfg.fromEmail,
       fromName: cfg.fromName,
+      cc: cfg.ccEmail,
     })
     await mark('email')
     return 'email'

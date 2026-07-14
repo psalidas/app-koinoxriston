@@ -21,6 +21,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Στοιχεία που εμφανίζονται ΜΟΝΟ στην εκτύπωση. */
+.print-only {
+  display: none;
+}
+
 /* ── Print ─────────────────────────────────────────────────────────────────
    Default portrait (ατομικά ειδοποιητήρια). Η συγκεντρωτική κατάσταση παίρνει
    `.print-landscape`. */
@@ -75,6 +80,10 @@ body {
 
   .print-landscape {
     page: landscape;
+  }
+
+  .print-only {
+    display: block;
   }
 
   /* Μία εγγραφή ανά σελίδα για μαζική εκτύπωση. */

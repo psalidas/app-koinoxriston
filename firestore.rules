@@ -82,6 +82,10 @@ service cloud.firestore {
       allow read: if isKnownUser();
       allow write: if isManager();
     }
+    // Αύξοντες μετρητές (π.χ. κωδικοί δαπανών) — managers.
+    match /counters/{id} {
+      allow read, write: if isManager();
+    }
     match /payments/{id} {
       allow read: if isKnownUser();
       allow write: if isManager();

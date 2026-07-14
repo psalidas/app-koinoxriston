@@ -2,6 +2,7 @@ import { money, formatPeriod, formatDate } from '@/lib/format'
 import type { ExpenseGroup, Statement, StatementRow } from '@/types'
 import { GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { rfReference, groupRef } from '@/lib/paymentRef'
+import { Footer } from './Footer'
 
 /** Το σώμα ενός ατομικού ειδοποιητηρίου (κοινό για single & μαζική εκτύπωση). */
 export function NoticeDocument({
@@ -97,6 +98,8 @@ export function NoticeDocument({
       <p className="mt-3 text-center text-[10px] text-gray-400">
         Έκδοση {formatDate(st.createdAt)} · {st.buildingCode}
       </p>
+
+      <Footer className="print-only mt-2 border-t border-gray-100" />
     </div>
   )
 }

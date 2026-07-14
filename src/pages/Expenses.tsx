@@ -1,21 +1,23 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Pencil, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Pencil, Sparkles, Paperclip, ArrowUpDown } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { money, currentPeriod, formatPeriod } from '@/lib/format'
-import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
+import { money, currentPeriod, formatDate } from '@/lib/format'
+import type { AllocationMethod, Expense, ExpenseChargeType, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
 import { uploadReceipt } from '@/lib/upload'
 import { analyzeReceipt } from '@/lib/ocr'
 import { UploadProgress } from '@/components/UploadProgress'
 import { logAudit } from '@/lib/audit'
-import { Paperclip } from 'lucide-react'
 
 type FormState = {
+  period: string // YYYY-MM (μήνας δαπάνης)
+  date: string // YYYY-MM-DD (ημ/νία παραστατικού, προαιρετικό)
+  chargeType: ExpenseChargeType
   group: ExpenseGroup
   category: string
   amount: number
@@ -27,13 +29,36 @@ type FormState = {
   receiptPath?: string
 }
 
+type ViewMode = 'month' | 'quarter' | 'year' | 'range'
+type SortKey = 'code' | 'date' | 'category' | 'amount'
+
+const thisYear = () => currentPeriod().slice(0, 4)
+const displayDate = (e: Expense): string =>
+  e.date ? new Date(e.date).toLocaleDateString('el-GR') : formatDate(e.createdAt)
+const dateKey = (e: Expense): string => e.date || (e.period ? `${e.period}-15` : '0000-00-00')
+
+function quarterMonths(year: string, q: number): string[] {
+  const start = (q - 1) * 3 + 1
+  return [0, 1, 2].map((i) => `${year}-${String(start + i).padStart(2, '0')}`)
+}
+
 export default function Expenses() {
   const { building, refresh } = useAppData()
   const { isManager, user, profile } = useAuth()
   const scales = building?.scales ?? []
-  const [period, setPeriod] = useState(currentPeriod())
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
+
+  // Φίλτρα προβολής
+  const [view, setView] = useState<ViewMode>('month')
+  const [month, setMonth] = useState(currentPeriod())
+  const [year, setYear] = useState(thisYear())
+  const [quarter, setQuarter] = useState(Math.floor((new Date().getMonth()) / 3) + 1)
+  const [rangeFrom, setRangeFrom] = useState(currentPeriod())
+  const [rangeTo, setRangeTo] = useState(currentPeriod())
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [toDelete, setToDelete] = useState<Expense | null>(null)
@@ -42,20 +67,27 @@ export default function Expenses() {
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiMsg, setAiMsg] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>({
-    group: 'koinoxrista',
-    category: '',
-    amount: 0,
-    method: 'millesime',
-    scaleKey: scales[0]?.key ?? 'genika',
-    note: '',
-  })
+  const [form, setForm] = useState<FormState>(blankForm(scales[0]?.key))
+
+  function blankForm(scaleKey?: string): FormState {
+    return {
+      period: currentPeriod(),
+      date: '',
+      chargeType: 'period',
+      group: 'koinoxrista',
+      category: '',
+      amount: 0,
+      method: 'millesime',
+      scaleKey: scaleKey ?? 'genika',
+      note: '',
+    }
+  }
 
   async function load() {
     if (!building) return
     setLoading(true)
     try {
-      setExpenses(await listExpenses(building.id, period))
+      setExpenses(await listExpenses(building.id))
     } finally {
       setLoading(false)
     }
@@ -64,26 +96,24 @@ export default function Expenses() {
   useEffect(() => {
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [building, period])
+  }, [building])
 
   function openNew() {
     setEditing(null)
     setFile(null)
-    setForm({
-      group: 'koinoxrista',
-      category: '',
-      amount: 0,
-      method: 'millesime',
-      scaleKey: scales[0]?.key ?? 'genika',
-      note: '',
-    })
+    setAiMsg(null)
+    setForm(blankForm(scales[0]?.key))
     setModalOpen(true)
   }
 
   function openEdit(e: Expense) {
     setEditing(e)
     setFile(null)
+    setAiMsg(null)
     setForm({
+      period: e.period,
+      date: e.date ?? '',
+      chargeType: e.chargeType ?? 'period',
       group: e.group,
       category: e.category,
       amount: e.amount,
@@ -107,11 +137,14 @@ export default function Expenses() {
         ...f,
         amount: res.amount ?? f.amount,
         category: res.category || res.merchant || f.category,
-        note: f.note || [res.merchant, res.date].filter(Boolean).join(' · '),
+        date: res.date || f.date,
+        period: res.date ? res.date.slice(0, 7) : f.period,
+        note: f.note || res.merchant || '',
       }))
       const got = [
         res.amount != null ? 'ποσό' : null,
         res.category ? 'κατηγορία' : null,
+        res.date ? 'ημ/νία' : null,
         res.merchant ? 'προμηθευτής' : null,
       ].filter(Boolean)
       setAiMsg(
@@ -149,7 +182,9 @@ export default function Expenses() {
     setUploadPct(null)
     const data = {
       buildingId: building.id,
-      period,
+      period: form.period,
+      date: form.date || undefined,
+      chargeType: form.chargeType,
       group: form.group,
       category: form.category.trim(),
       amount: Number(form.amount) || 0,
@@ -168,7 +203,6 @@ export default function Expenses() {
       action: editing ? 'update' : 'create',
       entity: 'expense',
       entityId: editing?.id ?? data.category,
-      after: data,
     })
     setModalOpen(false)
     await load()
@@ -182,55 +216,170 @@ export default function Expenses() {
     await load()
   }
 
-  const total = expenses.reduce((s, e) => s + e.amount, 0)
+  const filtered = useMemo(() => {
+    return expenses.filter((e) => {
+      if (view === 'month') return e.period === month
+      if (view === 'year') return e.period.startsWith(`${year}-`)
+      if (view === 'quarter') return quarterMonths(year, quarter).includes(e.period)
+      const f = rangeFrom <= rangeTo ? rangeFrom : rangeTo
+      const t = rangeFrom <= rangeTo ? rangeTo : rangeFrom
+      return e.period >= f && e.period <= t
+    })
+  }, [expenses, view, month, year, quarter, rangeFrom, rangeTo])
+
+  const sorted = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'amount') cmp = (a.amount || 0) - (b.amount || 0)
+      else if (sortKey === 'category') cmp = a.category.localeCompare(b.category, 'el')
+      else if (sortKey === 'code') cmp = (a.code ?? '').localeCompare(b.code ?? '', 'el')
+      else cmp = dateKey(a).localeCompare(dateKey(b))
+      return cmp * dir
+    })
+  }, [filtered, sortKey, sortDir])
+
+  const total = sorted.reduce((s, e) => s + e.amount, 0)
   const needsScale = form.method === 'millesime' || form.method === 'heating'
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(k)
+      setSortDir(k === 'amount' || k === 'date' ? 'desc' : 'asc')
+    }
+  }
+
+  const Th = ({ k, label, right }: { k: SortKey; label: string; right?: boolean }) => (
+    <th className={`px-3 py-2 ${right ? 'text-right' : ''}`}>
+      <button
+        onClick={() => toggleSort(k)}
+        className={`inline-flex items-center gap-1 hover:text-gray-700 ${right ? 'flex-row-reverse' : ''}`}
+      >
+        {label}
+        <ArrowUpDown size={12} className={sortKey === k ? 'text-blue-600' : 'text-gray-300'} />
+      </button>
+    </th>
+  )
 
   return (
     <div>
       <PageHeader
         title="Δαπάνες"
-        subtitle={`${formatPeriod(period)} · σύνολο ${money(total)}`}
+        subtitle={`${sorted.length} δαπάνες · σύνολο ${money(total)}`}
         actions={
-          <>
-            <input
-              type="month"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-            />
-            {isManager && (
-              <Button onClick={openNew}>
-                <Plus size={18} /> Νέα δαπάνη
-              </Button>
-            )}
-          </>
+          isManager && (
+            <Button onClick={openNew}>
+              <Plus size={18} /> Νέα δαπάνη
+            </Button>
+          )
         }
       />
+
+      {/* Φίλτρα */}
+      <Card className="mb-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Προβολή">
+            <SelectField value={view} onChange={(e) => setView(e.target.value as ViewMode)}>
+              <option value="month">Μήνας</option>
+              <option value="quarter">Τρίμηνο</option>
+              <option value="year">Έτος</option>
+              <option value="range">Εύρος</option>
+            </SelectField>
+          </Field>
+
+          {view === 'month' && (
+            <Field label="Μήνας">
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </Field>
+          )}
+          {view === 'quarter' && (
+            <>
+              <Field label="Τρίμηνο">
+                <SelectField value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
+                  <option value={1}>Α΄ (Ιαν–Μαρ)</option>
+                  <option value={2}>Β΄ (Απρ–Ιουν)</option>
+                  <option value={3}>Γ΄ (Ιουλ–Σεπ)</option>
+                  <option value={4}>Δ΄ (Οκτ–Δεκ)</option>
+                </SelectField>
+              </Field>
+              <Field label="Έτος">
+                <input
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </Field>
+            </>
+          )}
+          {view === 'year' && (
+            <Field label="Έτος">
+              <input
+                type="number"
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="w-28 rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </Field>
+          )}
+          {view === 'range' && (
+            <>
+              <Field label="Από">
+                <input
+                  type="month"
+                  value={rangeFrom}
+                  onChange={(e) => setRangeFrom(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </Field>
+              <Field label="Έως">
+                <input
+                  type="month"
+                  value={rangeTo}
+                  onChange={(e) => setRangeTo(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </Field>
+            </>
+          )}
+        </div>
+      </Card>
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <th className="px-3 py-2">Κατηγορία</th>
+              <Th k="code" label="Κωδ." />
+              <Th k="date" label="Ημ/νία" />
+              <Th k="category" label="Κατηγορία" />
               <th className="px-3 py-2">Ομάδα</th>
               <th className="px-3 py-2">Επιμερισμός</th>
-              <th className="px-3 py-2 text-right">Ποσό</th>
+              <Th k="amount" label="Ποσό" right />
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {expenses.length === 0 && !loading && (
+            {sorted.length === 0 && !loading && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-gray-400">
-                  Δεν υπάρχουν δαπάνες για {formatPeriod(period)}.
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                  Δεν υπάρχουν δαπάνες για την επιλεγμένη προβολή.
                 </td>
               </tr>
             )}
-            {expenses.map((e) => (
+            {sorted.map((e) => (
               <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-3 py-2 tnum text-xs text-gray-500">{e.code ?? '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-600">{displayDate(e)}</td>
                 <td className="px-3 py-2 font-medium text-gray-900">
                   <span className="inline-flex items-center gap-1.5">
                     {e.category}
+                    {e.chargeType === 'special' && <Badge color="amber">Έκτακτη</Badge>}
                     {e.receiptUrl && (
                       <a
                         href={e.receiptUrl}
@@ -270,11 +419,11 @@ export default function Expenses() {
               </tr>
             ))}
           </tbody>
-          {expenses.length > 0 && (
+          {sorted.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2" colSpan={3}>
-                  ΣΥΝΟΛΟ
+                <td className="px-3 py-2" colSpan={5}>
+                  ΣΥΝΟΛΟ ({sorted.length})
                 </td>
                 <td className="px-3 py-2 text-right tnum">{money(total)}</td>
                 <td></td>
@@ -288,6 +437,7 @@ export default function Expenses() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? 'Επεξεργασία δαπάνης' : 'Νέα δαπάνη'}
+        wide
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
@@ -299,95 +449,100 @@ export default function Expenses() {
           </>
         }
       >
-        <div className="space-y-3">
-          <Field label="Κατηγορία / Περιγραφή">
-            <TextField
-              placeholder="π.χ. ΔΕΗ κοινοχρήστων"
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-            />
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Ομάδα (στήλη κατάστασης)">
-              <SelectField
-                value={form.group}
-                onChange={(e) => setForm({ ...form, group: e.target.value as ExpenseGroup })}
-              >
-                {GROUP_ORDER.map((g) => (
-                  <option key={g} value={g}>
-                    {GROUP_LABELS[g]}
-                  </option>
-                ))}
-              </SelectField>
-            </Field>
-            <Field label="Ποσό (€)">
-              <NumberField
-                step="0.01"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })}
-              />
-            </Field>
-            <Field label="Τρόπος επιμερισμού">
-              <SelectField
-                value={form.method}
-                onChange={(e) => setForm({ ...form, method: e.target.value as AllocationMethod })}
-              >
-                {(Object.keys(ALLOCATION_LABELS) as AllocationMethod[]).map((m) => (
-                  <option key={m} value={m}>
-                    {ALLOCATION_LABELS[m]}
-                  </option>
-                ))}
-              </SelectField>
-            </Field>
-            {needsScale && (
-              <Field label="Πίνακας χιλιοστών">
-                <SelectField
-                  value={form.scaleKey}
-                  onChange={(e) => setForm({ ...form, scaleKey: e.target.value })}
-                >
-                  {scales.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </SelectField>
-              </Field>
-            )}
-          </div>
-          <Field label="Σημείωση (προαιρετικό)">
-            <TextField value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          </Field>
-          <Field label="Παραστατικό (εικόνα ή PDF)">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Μήνας δαπάνης">
             <input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null)
-                setAiMsg(null)
-              }}
-              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              type="month"
+              value={form.period}
+              onChange={(e) => setForm({ ...form, period: e.target.value })}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             />
-            {file && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Button variant="secondary" onClick={analyze} disabled={aiBusy}>
-                  <Sparkles size={16} /> {aiBusy ? 'Ανάλυση…' : 'Ανάλυση AI'}
-                </Button>
-                <span className="text-xs text-gray-500">Αυτόματη συμπλήρωση φόρμας από το παραστατικό</span>
-              </div>
-            )}
-            {aiMsg && <p className="mt-1 text-xs text-gray-500">{aiMsg}</p>}
-            <UploadProgress value={uploadPct} />
-            {form.receiptUrl && !file && (
-              <a
-                href={form.receiptUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-              >
-                <Paperclip size={14} /> {form.receiptName ?? 'Τρέχον παραστατικό'}
-              </a>
-            )}
           </Field>
+          <Field label="Ημ/νία παραστατικού (προαιρετικό)">
+            <TextField type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </Field>
+          <Field label="Χρέωση" hint="«Έκτακτη» → δεν μπαίνει στη μηνιαία έκδοση· κατανέμεται σε έκτακτη.">
+            <SelectField
+              value={form.chargeType}
+              onChange={(e) => setForm({ ...form, chargeType: e.target.value as ExpenseChargeType })}
+            >
+              <option value="period">Περιόδου</option>
+              <option value="special">Έκτακτη</option>
+            </SelectField>
+          </Field>
+          <Field label="Κατηγορία">
+            <TextField value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          </Field>
+          <Field label="Ομάδα (στήλη)">
+            <SelectField value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value as ExpenseGroup })}>
+              {GROUP_ORDER.map((g) => (
+                <option key={g} value={g}>
+                  {GROUP_LABELS[g]}
+                </option>
+              ))}
+            </SelectField>
+          </Field>
+          <Field label="Ποσό (€)">
+            <NumberField step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+          </Field>
+          <Field label="Μέθοδος επιμερισμού">
+            <SelectField value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value as AllocationMethod })}>
+              {(Object.keys(ALLOCATION_LABELS) as AllocationMethod[]).map((m) => (
+                <option key={m} value={m}>
+                  {ALLOCATION_LABELS[m]}
+                </option>
+              ))}
+            </SelectField>
+          </Field>
+          {needsScale && (
+            <Field label="Πίνακας χιλιοστών">
+              <SelectField value={form.scaleKey} onChange={(e) => setForm({ ...form, scaleKey: e.target.value })}>
+                {scales.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </SelectField>
+            </Field>
+          )}
+          <div className="sm:col-span-2">
+            <Field label="Σημείωση (προαιρετικό)">
+              <TextField value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            </Field>
+          </div>
+          <div className="sm:col-span-2">
+            <Field label="Παραστατικό (εικόνα ή PDF)">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] ?? null)
+                  setAiMsg(null)
+                }}
+                className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {file && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button variant="secondary" onClick={analyze} disabled={aiBusy}>
+                    <Sparkles size={16} /> {aiBusy ? 'Ανάλυση…' : 'Ανάλυση AI'}
+                  </Button>
+                  <span className="text-xs text-gray-500">Αυτόματη συμπλήρωση φόρμας από το παραστατικό</span>
+                </div>
+              )}
+              {aiMsg && <p className="mt-1 text-xs text-gray-500">{aiMsg}</p>}
+              <UploadProgress value={uploadPct} />
+              {form.receiptUrl && !file && (
+                <a
+                  href={form.receiptUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                >
+                  <Paperclip size={14} /> {form.receiptName ?? 'Τρέχον παραστατικό'}
+                </a>
+              )}
+            </Field>
+          </div>
         </div>
       </Modal>
 

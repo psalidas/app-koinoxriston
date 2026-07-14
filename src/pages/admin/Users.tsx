@@ -9,6 +9,7 @@ import type { Role, UserDoc } from '@/types'
 import { ROLE_LABELS } from '@/types'
 import { listUsers, saveUser, deleteUser } from '@/lib/repos/users'
 import { resendInvite } from '@/lib/invites'
+import { normalizeIdentifier } from '@/lib/format'
 import { logAudit } from '@/lib/audit'
 
 const emptyForm = () => ({
@@ -80,7 +81,7 @@ export default function Users() {
   }
 
   async function save() {
-    const email = form.email.trim().toLowerCase()
+    const email = normalizeIdentifier(form.email)
     if (!email) return
     await saveUser(email, {
       name: form.name.trim(),

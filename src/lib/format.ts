@@ -87,6 +87,20 @@ export function compareEl(a: string, b: string): number {
   return a.localeCompare(b, 'el')
 }
 
+/**
+ * Κανονικοποιεί ένα αναγνωριστικό εισόδου (email ή κινητό) ώστε να ταιριάζει
+ * αξιόπιστα με το id του /users doc. Αφαιρεί αόρατους χαρακτήρες (zero-width,
+ * NBSP), κάθε κενό, εφαρμόζει NFKC και πεζά. Έτσι μια «βρόμικη» επικόλληση
+ * (π.χ. κρυφός χαρακτήρας) δεν σπάει το ταίριασμα Google ↔ magic-link.
+ */
+export function normalizeIdentifier(raw: string | null | undefined): string {
+  return (raw ?? '')
+    .normalize('NFKC')
+    .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '') // zero-width chars
+    .replace(/\s+/g, '') // email/κινητό δεν έχουν κενά
+    .toLowerCase()
+}
+
 /** Current period 'YYYY-MM' in Athens time. */
 export function currentPeriod(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

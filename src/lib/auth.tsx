@@ -17,6 +17,7 @@ import {
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { requestMagicLink } from './magic'
+import { normalizeIdentifier } from './format'
 import type { Role, UserDoc } from '@/types'
 
 const BOOTSTRAP_ADMIN = 'michael@crowdpolicy.com'
@@ -93,6 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // αγνόησε — θα χρησιμοποιήσουμε email/phone
         }
+        // Κανονικοποίηση ώστε το lookup να ταιριάζει πάντα με το doc id
+        // (π.χ. Google email vs αποθηκευμένο id με κρυφούς χαρακτήρες).
+        identifier = identifier ? normalizeIdentifier(identifier) : identifier
         // Ποτέ να μη μείνει η εφαρμογή στο «Φόρτωση…» αν αποτύχει το read.
         let profile: UserDoc | null = null
         try {

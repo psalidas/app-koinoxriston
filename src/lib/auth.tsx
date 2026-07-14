@@ -8,6 +8,8 @@ import {
 import {
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  updatePassword,
   signOut as fbSignOut,
   onAuthStateChanged,
   type User,
@@ -33,6 +35,10 @@ interface AuthContextValue extends AuthState {
   signInWithGoogle: () => Promise<void>
   /** Στέλνει magic link σε email ή κινητό (ενιαία είσοδος). */
   sendMagicLink: (identifier: string) => Promise<void>
+  /** Κλασική είσοδος με email & κωδικό. */
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  /** Ορισμός/αλλαγή κωδικού για τον τρέχοντα (email) λογαριασμό. */
+  setPassword: (newPassword: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -118,6 +124,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await requestMagicLink(identifier.trim())
   }
 
+  async function signInWithPassword(email: string, password: string) {
+    if (!auth) throw new Error('Firebase δεν έχει ρυθμιστεί')
+    await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password)
+  }
+
+  async function setPassword(newPassword: string) {
+    if (!auth?.currentUser) throw new Error('Δεν είστε συνδεδεμένος')
+    await updatePassword(auth.currentUser, newPassword)
+  }
+
   async function signOut() {
     if (!auth) return
     await fbSignOut(auth)
@@ -125,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, signInWithGoogle, sendMagicLink, signOut }}
+      value={{ ...state, signInWithGoogle, sendMagicLink, signInWithPassword, setPassword, signOut }}
     >
       {children}
     </AuthContext.Provider>

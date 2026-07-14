@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Pencil, Save, X, Building2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Pencil, Save, X, Building2, KeyRound } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Card, PageHeader, Field, TextField, Button, Toggle } from '@/components/forms'
@@ -20,9 +20,47 @@ const FIELDS: { key: keyof Contact; visKey: keyof ContactVisibility; label: stri
 ]
 
 export default function MyProfile() {
-  const { profile } = useAuth()
+  const { profile, setPassword } = useAuth()
   const { building, apartments } = useAppData()
+  const [params] = useSearchParams()
   const identifier = profile?.email ?? ''
+  const isEmailUser = identifier.includes('@')
+
+  // Κωδικός πρόσβασης (μόνο email λογαριασμοί)
+  const [pw1, setPw1] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const wantSetPw = params.get('setpw') === '1'
+
+  async function savePassword() {
+    if (pw1.length < 8) {
+      setPwMsg({ ok: false, text: 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.' })
+      return
+    }
+    if (pw1 !== pw2) {
+      setPwMsg({ ok: false, text: 'Οι κωδικοί δεν ταιριάζουν.' })
+      return
+    }
+    setPwBusy(true)
+    setPwMsg(null)
+    try {
+      await setPassword(pw1)
+      setPw1('')
+      setPw2('')
+      setPwMsg({ ok: true, text: 'Ο κωδικός αποθηκεύτηκε. Μπορείτε πλέον να μπαίνετε και με κωδικό.' })
+    } catch (e) {
+      const code = (e as { code?: string })?.code ?? ''
+      setPwMsg({
+        ok: false,
+        text: code.includes('requires-recent-login')
+          ? 'Για ασφάλεια, ξανασυνδεθείτε με σύνδεσμο εισόδου και δοκιμάστε ξανά.'
+          : 'Αποτυχία: ' + ((e as Error).message || 'άγνωστο σφάλμα'),
+      })
+    } finally {
+      setPwBusy(false)
+    }
+  }
 
   // Ιδιοκτησία & χιλιοστά — μόνο για ιδιοκτήτες/ενοίκους με διαμερίσματα.
   const isOwnerOrResident = profile?.role === 'owner' || profile?.role === 'resident'
@@ -185,6 +223,43 @@ export default function MyProfile() {
           ))}
         </div>
       </Card>
+
+      {isEmailUser && (
+        <Card className={`mt-4 ${wantSetPw ? 'ring-2 ring-blue-400' : ''}`}>
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <KeyRound size={16} /> Κωδικός πρόσβασης
+          </h2>
+          <p className="mb-3 text-xs text-gray-500">
+            Προαιρετικό. Αν ορίσεις κωδικό, θα μπορείς να μπαίνεις και με email + κωδικό (εκτός από
+            τον σύνδεσμο εισόδου).
+          </p>
+          {pwMsg && (
+            <div
+              className={`mb-3 rounded-md p-2 text-sm ${pwMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+            >
+              {pwMsg.text}
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Νέος κωδικός">
+              <TextField
+                type="password"
+                autoFocus={wantSetPw}
+                value={pw1}
+                onChange={(e) => setPw1(e.target.value)}
+              />
+            </Field>
+            <Field label="Επιβεβαίωση">
+              <TextField type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-3">
+            <Button onClick={savePassword} disabled={pwBusy || !pw1 || !pw2}>
+              <Save size={16} /> {pwBusy ? 'Αποθήκευση…' : 'Αποθήκευση κωδικού'}
+            </Button>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

@@ -136,10 +136,16 @@ export const GROUP_ORDER: ExpenseGroup[] = [
   'isoposes',
 ]
 
+/** Πώς χρεώνεται η δαπάνη: στην τακτική έκδοση περιόδου ή σε έκτακτη κατανομή. */
+export type ExpenseChargeType = 'period' | 'special'
+
 export interface Expense {
   id: string
   buildingId: string
+  code?: string // αύξων κωδικός, π.χ. «Δ-0001»
   period: string // 'YYYY-MM'
+  date?: string // 'YYYY-MM-DD' ημ/νία παραστατικού (προαιρετικό)
+  chargeType?: ExpenseChargeType // default 'period'
   group: ExpenseGroup
   category: string // e.g. 'ΔΕΗ κοινοχρήστων'
   amount: number

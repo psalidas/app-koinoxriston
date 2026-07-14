@@ -1,9 +1,10 @@
 import {
-  addDoc,
+  collection,
   deleteDoc,
   doc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
@@ -22,12 +23,22 @@ export async function listExpenses(
   return rows.sort((a, b) => (a.period < b.period ? 1 : a.period > b.period ? -1 : 0))
 }
 
+/**
+ * Δημιουργεί δαπάνη με αύξοντα κωδικό «Δ-NNNN» ανά κτίριο (counter σε
+ * transaction ώστε να μη διπλασιάζεται σε ταυτόχρονες εγγραφές).
+ */
 export async function createExpense(data: Omit<Expense, 'id'>): Promise<string> {
-  const ref = await addDoc(col('expenses'), {
-    ...clean(data),
-    createdAt: serverTimestamp(),
+  const db = requireDb()
+  const counterRef = doc(db, 'counters', data.buildingId)
+  const expRef = doc(collection(db, 'expenses'))
+  await runTransaction(db, async (tx) => {
+    const cs = await tx.get(counterRef)
+    const seq = (((cs.exists() ? (cs.data().expenseSeq as number) : 0) || 0) as number) + 1
+    const code = `Δ-${String(seq).padStart(4, '0')}`
+    tx.set(counterRef, { expenseSeq: seq }, { merge: true })
+    tx.set(expRef, { ...clean(data), code, createdAt: serverTimestamp() })
   })
-  return ref.id
+  return expRef.id
 }
 
 export async function updateExpense(id: string, patch: Partial<Expense>): Promise<void> {

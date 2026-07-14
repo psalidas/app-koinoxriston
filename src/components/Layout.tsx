@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { Footer } from './Footer'
 import { AppDataProvider } from '@/lib/appData'
 
 export function Layout() {
@@ -31,6 +32,7 @@ export function Layout() {
           </div>
           <main className="app-main flex-1 overflow-y-auto p-4 sm:p-6">
             <Outlet />
+            <Footer className="no-print mt-8 border-t border-gray-100" />
           </main>
         </div>
       </div>

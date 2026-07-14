@@ -53,9 +53,12 @@ export default function Statements() {
     if (building) void listExpenses(building.id).then(setAllExpenses)
   }
 
-  // Έκτακτο: επιλογή συγκεκριμένων δαπανών (πιο πρόσφατες πρώτα).
+  // Έκτακτο: επιλογή μόνο από δαπάνες με χρέωση «Έκτακτη» (πιο πρόσφατες πρώτα).
   const pickable = useMemo(
-    () => [...allExpenses].sort((a, b) => (a.period < b.period ? 1 : -1)),
+    () =>
+      allExpenses
+        .filter((e) => e.chargeType === 'special')
+        .sort((a, b) => (a.period < b.period ? 1 : -1)),
     [allExpenses],
   )
 
@@ -101,7 +104,9 @@ export default function Statements() {
       } else {
         from = fromP <= toP ? fromP : toP
         to = fromP <= toP ? toP : fromP
-        selected = expenses.filter((e) => e.period >= from! && e.period <= to!)
+        selected = expenses.filter(
+          (e) => e.period >= from! && e.period <= to! && (e.chargeType ?? 'period') !== 'special',
+        )
         anchor = to
         label = periodLabel.trim() || (from === to ? formatPeriod(from) : `${formatPeriod(from)} – ${formatPeriod(to)}`)
         const prior = allStatements.filter((s) => s.status === 'issued' && s.period < to!)
@@ -280,7 +285,9 @@ export default function Statements() {
               </div>
               <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200">
                 {pickable.length === 0 ? (
-                  <p className="px-3 py-4 text-center text-sm text-gray-400">Δεν υπάρχουν δαπάνες.</p>
+                  <p className="px-3 py-4 text-center text-sm text-gray-400">
+                    Καμία δαπάνη με χρέωση «Έκτακτη». Όρισέ το στη δαπάνη.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-gray-100">
                     {pickable.map((e) => (
@@ -304,7 +311,7 @@ export default function Statements() {
                 )}
               </div>
               <p className="mt-1 text-xs text-gray-400">
-                Χωρίς μεταφορά προηγούμενου υπολοίπου. Επίλεξε π.χ. τη δαπάνη μιας εργασίας.
+                Εμφανίζονται μόνο δαπάνες με χρέωση «Έκτακτη». Χωρίς μεταφορά προηγούμενου υπολοίπου.
               </p>
             </div>
           )}

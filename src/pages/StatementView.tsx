@@ -5,6 +5,7 @@ import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Badge } from '@/components/forms'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { Footer } from '@/components/Footer'
 import { amount, mille, formatDate } from '@/lib/format'
 import type { ExpenseGroup, Statement } from '@/types'
 import { GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
@@ -64,7 +65,9 @@ export default function StatementView() {
         listStatements(building.id),
         listPayments(building.id),
       ])
-      const selected = expenses.filter((e) => e.period >= from && e.period <= to)
+      const selected = expenses.filter(
+        (e) => e.period >= from && e.period <= to && (e.chargeType ?? 'period') !== 'special',
+      )
       const prior = allStatements.filter(
         (s) => s.status === 'issued' && s.id !== st.id && s.period < to,
       )
@@ -263,6 +266,8 @@ export default function StatementView() {
         <div className="mt-3 text-right text-[10px] text-gray-500">
           Γενικό σύνολο δαπανών: <span className="tnum font-bold text-gray-900">{amount(st.totals.grandTotal)} €</span>
         </div>
+
+        <Footer className="print-only mt-2 border-t border-gray-100" />
       </div>
 
       {/* Individual notices */}

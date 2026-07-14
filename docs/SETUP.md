@@ -210,6 +210,21 @@ custom token → `signInWithCustomToken`). Δεν χρειάζεται Firebase 
 - (Προαιρετικό) Firestore **TTL policy** στο πεδίο `magicTokens.expiresAt` για
   αυτόματο καθάρισμα ληγμένων tokens.
 
+### 10.5 AI ανάλυση παραστατικών (Δαπάνες)
+
+Στη φόρμα δαπάνης, μετά την επιλογή αρχείου, το κουμπί **«Ανάλυση AI»** διαβάζει
+το παραστατικό (Claude Haiku 4.5 vision) και προσυμπληρώνει ποσό/κατηγορία/
+προμηθευτή. Callable `ocrReceipt`.
+
+- **GitHub Secret `ANTHROPIC_API_KEY`** (console.anthropic.com) — ανεβαίνει ως
+  env των functions κατά το deploy (όπως Brevo/sms.to).
+- Οι εικόνες γίνονται downscale στον client πριν σταλούν· τα PDF στέλνονται ως έχουν.
+- **Public invoker** (αν δεν εφαρμοστεί αυτόματα):
+  ```bash
+  gcloud run services add-iam-policy-binding ocrreceipt \
+    --region=europe-west1 --member=allUsers --role=roles/run.invoker --project=app-koinoxriston
+  ```
+
 ---
 
 ## Troubleshooting

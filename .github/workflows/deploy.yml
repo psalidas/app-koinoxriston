@@ -57,10 +57,12 @@ jobs:
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           SMSTO_API_KEY: ${{ secrets.SMSTO_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           {
             printf 'BREVO_API_KEY=%s\n' "$BREVO_API_KEY"
             printf 'SMSTO_API_KEY=%s\n' "$SMSTO_API_KEY"
+            printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
           } > functions/.env
 
       - name: Install functions dependencies

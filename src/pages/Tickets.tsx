@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/format'
 import type { Ticket, TicketStatus } from '@/types'
 import { TICKET_CATEGORIES, TICKET_STATUS_LABELS } from '@/types'
 import { listTickets, createTicket, updateTicket, deleteTicket } from '@/lib/repos/tickets'
+import { logAudit } from '@/lib/audit'
 import { uploadReceipt } from '@/lib/upload'
 import { UploadProgress } from '@/components/UploadProgress'
 
@@ -78,6 +79,14 @@ export default function Tickets() {
         createdBy: user?.email ?? undefined,
         createdByName: profile?.name ?? user?.email ?? undefined,
         ...photo,
+      })
+      await logAudit({
+        buildingId: building.id,
+        userEmail: profile?.email ?? user?.email ?? '',
+        userName: profile?.name ?? user?.email ?? '',
+        action: 'create',
+        entity: 'ticket',
+        entityId: form.title.trim(),
       })
       setModalOpen(false)
       await load()

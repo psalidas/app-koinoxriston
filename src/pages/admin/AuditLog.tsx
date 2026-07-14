@@ -14,6 +14,7 @@ const ACTION_COLOR: Record<string, 'green' | 'blue' | 'red' | 'amber' | 'gray' |
   import: 'amber',
   export: 'amber',
   login: 'purple',
+  vote: 'amber',
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -23,6 +24,7 @@ const ACTION_LABEL: Record<string, string> = {
   import: 'Εισαγωγή',
   export: 'Εξαγωγή',
   login: 'Είσοδος',
+  vote: 'Ψήφος',
 }
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -36,6 +38,12 @@ const ENTITY_LABEL: Record<string, string> = {
   expense: 'Δαπάνη',
   statement: 'Κοινόχρηστα',
   payment: 'Πληρωμή',
+  ticket: 'Βλάβη / Αίτημα',
+  topic: 'Θέμα συζήτησης',
+  comment: 'Σχόλιο',
+  offer: 'Προσφορά',
+  poll: 'Ψηφοφορία',
+  profile: 'Τα στοιχεία μου',
 }
 
 const actionLabel = (a: string) => ACTION_LABEL[a] ?? a

@@ -7,6 +7,7 @@ import { Card, PageHeader, Field, TextField, Button, Toggle } from '@/components
 import { mille } from '@/lib/format'
 import type { ContactVisibility } from '@/types'
 import { getProfile, saveContact } from '@/lib/repos/directory'
+import { logAudit } from '@/lib/audit'
 
 type Contact = { displayName: string; phone: string; mobile: string; email: string; note: string }
 const EMPTY: Contact = { displayName: '', phone: '', mobile: '', email: '', note: '' }
@@ -118,6 +119,14 @@ export default function MyProfile() {
         { ...contact, visibility },
         { role: profile.role, name: profile.name, apartmentCodes: myApts.map((a) => a.code) },
       )
+      await logAudit({
+        buildingId: building?.id,
+        userEmail: identifier,
+        userName: profile.name ?? identifier,
+        action: 'update',
+        entity: 'profile',
+        entityId: 'στοιχεία επικοινωνίας',
+      })
       setEditing(false)
       setMsg('Αποθηκεύτηκε.')
     } finally {

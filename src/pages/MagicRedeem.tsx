@@ -18,11 +18,12 @@ export default function MagicRedeem() {
       setError('Μη έγκυρος σύνδεσμος.')
       return
     }
+    const setpw = params.get('setpw') === '1'
     ;(async () => {
       try {
         const { token: customToken } = await redeemMagicLink(token)
         await signInWithCustomToken(auth, customToken)
-        navigate('/', { replace: true })
+        navigate(setpw ? '/my-profile?setpw=1' : '/', { replace: true })
       } catch (e) {
         setError((e as Error).message || 'Η είσοδος απέτυχε.')
       }

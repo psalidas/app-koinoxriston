@@ -32,6 +32,10 @@ export async function createStatement(data: Omit<Statement, 'id'>): Promise<stri
   return ref.id
 }
 
+export async function updateStatement(id: string, patch: Partial<Statement>): Promise<void> {
+  await updateDoc(doc(requireDb(), 'statements', id), clean(patch))
+}
+
 export async function markIssued(id: string, issuedBy: string): Promise<void> {
   await updateDoc(doc(requireDb(), 'statements', id), {
     status: 'issued',

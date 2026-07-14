@@ -225,8 +225,11 @@ export interface Statement {
   buildingName: string
   buildingAddress: string
   managerName: string
-  period: string // 'YYYY-MM'
+  period: string // 'YYYY-MM' (anchor: για εύρος = το «έως»)
   periodLabel: string // free text, e.g. '1/6 έως 31/12/2025'
+  kind?: 'period' | 'special' // 'special' = έκτακτη κατανομή
+  periodFrom?: string // 'YYYY-MM' (για εύρος περιόδου)
+  periodTo?: string // 'YYYY-MM'
   status: 'draft' | 'issued'
   issuedAt?: Timestamp
   issuedBy?: string

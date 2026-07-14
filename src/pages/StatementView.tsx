@@ -1,20 +1,35 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, Download, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Printer, Download, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react'
+import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Badge } from '@/components/forms'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { amount, mille, formatDate } from '@/lib/format'
 import type { ExpenseGroup, Statement } from '@/types'
 import { GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
-import { getStatement, markIssued } from '@/lib/repos/statements'
+import {
+  getStatement,
+  markIssued,
+  updateStatement,
+  deleteStatement,
+  listStatements,
+} from '@/lib/repos/statements'
+import { listExpenses } from '@/lib/repos/expenses'
+import { listPayments } from '@/lib/repos/payments'
+import { computeStatement } from '@/lib/allocation'
+import { balancesByApartment } from '@/lib/balances'
 import { exportStatement } from '@/lib/exports'
 
 export default function StatementView() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { building, apartments } = useAppData()
   const { isManager, user } = useAuth()
   const [st, setSt] = useState<Statement | null>(null)
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -37,6 +52,42 @@ export default function StatementView() {
     setSt({ ...st, status: 'issued' })
   }
 
+  /** Ξαναϋπολογίζει το πρόχειρο ώστε να συμπεριλάβει νέες δαπάνες της περιόδου. */
+  async function refreshDraft() {
+    if (!st || !building) return
+    setBusy(true)
+    try {
+      const from = st.periodFrom ?? st.period
+      const to = st.periodTo ?? st.period
+      const [expenses, allStatements, payments] = await Promise.all([
+        listExpenses(building.id),
+        listStatements(building.id),
+        listPayments(building.id),
+      ])
+      const selected = expenses.filter((e) => e.period >= from && e.period <= to)
+      const prior = allStatements.filter(
+        (s) => s.status === 'issued' && s.id !== st.id && s.period < to,
+      )
+      const previousBalances = balancesByApartment(prior, payments)
+      const { rows, totals, expenseLines } = computeStatement({
+        building,
+        apartments,
+        expenses: selected,
+        previousBalances,
+      })
+      await updateStatement(st.id, { rows, totals, expenseLines })
+      setSt({ ...st, rows, totals, expenseLines })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!st) return
+    await deleteStatement(st.id)
+    navigate('/statements')
+  }
+
   return (
     <div>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -56,6 +107,16 @@ export default function StatementView() {
           <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/notices`)}>
             <Printer size={18} /> Όλα τα ειδοποιητήρια
           </Button>
+          {isManager && st.status !== 'issued' && st.kind !== 'special' && (
+            <Button variant="secondary" onClick={refreshDraft} disabled={busy}>
+              <RefreshCw size={18} /> {busy ? 'Ανανέωση…' : 'Ανανέωση'}
+            </Button>
+          )}
+          {isManager && st.status !== 'issued' && (
+            <Button variant="danger" onClick={() => setShowDelete(true)}>
+              <Trash2 size={18} /> Διαγραφή
+            </Button>
+          )}
           {isManager && st.status !== 'issued' && (
             <Button onClick={issue}>
               <CheckCircle2 size={18} /> Οριστικοποίηση
@@ -220,6 +281,13 @@ export default function StatementView() {
           ))}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDelete}
+        message="Διαγραφή αυτής της πρόχειρης έκδοσης;"
+        onCancel={() => setShowDelete(false)}
+        onConfirm={remove}
+      />
     </div>
   )
 }

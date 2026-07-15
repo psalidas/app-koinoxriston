@@ -111,6 +111,15 @@ export default function Users() {
     await load()
   }
 
+  // Κωδικοί διαμερισμάτων που έχει αντιστοιχιστεί ο χρήστης (ταξινομημένοι).
+  function aptCodesFor(u: UserDoc): string[] {
+    const ids = u.apartmentIds ?? []
+    return apartments
+      .filter((a) => ids.includes(a.id))
+      .sort((a, b) => a.orderNo - b.orderNo)
+      .map((a) => a.code)
+  }
+
   // Ένδειξη καναλιού πρόσκλησης με βάση το αναγνωριστικό (νέος χρήστης).
   const inviteChannelHint = (() => {
     const id = form.email.trim()
@@ -137,6 +146,7 @@ export default function Users() {
               <th className="px-3 py-2">Όνομα</th>
               <th className="px-3 py-2">Email</th>
               <th className="px-3 py-2">Ρόλος</th>
+              <th className="px-3 py-2">Διαμερίσματα</th>
               <th className="px-3 py-2">Κατάσταση</th>
               <th className="px-3 py-2"></th>
             </tr>
@@ -148,6 +158,19 @@ export default function Users() {
                 <td className="px-3 py-2 text-gray-600">{u.email}</td>
                 <td className="px-3 py-2">
                   <Badge color="blue">{ROLE_LABELS[u.role]}</Badge>
+                </td>
+                <td className="px-3 py-2">
+                  {aptCodesFor(u).length === 0 ? (
+                    <span className="text-xs text-gray-300">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {aptCodesFor(u).map((code) => (
+                        <Badge key={code} color="gray">
+                          {code}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap items-center gap-1">
@@ -187,7 +210,7 @@ export default function Users() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-3 py-8 text-center text-gray-400">
                   Δεν υπάρχουν χρήστες ακόμη.
                 </td>
               </tr>

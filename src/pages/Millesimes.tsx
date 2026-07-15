@@ -2,11 +2,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { Save, Download, RotateCcw } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
-import { Button, Card, PageHeader } from '@/components/forms'
+import { Button, Card, PageHeader, Badge } from '@/components/forms'
 import { mille } from '@/lib/format'
 import { updateMillesimes } from '@/lib/repos/apartments'
+import { listUsers } from '@/lib/repos/users'
 import { exportMillesimes } from '@/lib/exports'
 import { logAudit } from '@/lib/audit'
+import type { Role, UserDoc } from '@/types'
+
+const ROLE_SHORT: Record<Role, string> = {
+  admin: 'Διαχειριστής',
+  manager: 'Διαχειριστής',
+  owner: 'Ιδιοκτήτης',
+  resident: 'Ένοικος',
+}
+
+const ROLE_BADGE: Record<Role, 'blue' | 'green' | 'amber' | 'gray'> = {
+  admin: 'blue',
+  manager: 'blue',
+  owner: 'green',
+  resident: 'amber',
+}
 
 export default function Millesimes() {
   const { building, apartments, refresh } = useAppData()
@@ -15,6 +31,24 @@ export default function Millesimes() {
   const [draft, setDraft] = useState<Record<string, Record<string, number>>>({})
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [users, setUsers] = useState<UserDoc[]>([])
+
+  useEffect(() => {
+    listUsers()
+      .then(setUsers)
+      .catch(() => {})
+  }, [])
+
+  // Αντιστοίχιση διαμερίσματος → χρήστες (ιδιοκτήτες/ένοικοι/διαχειριστές).
+  const usersByApt = useMemo(() => {
+    const m: Record<string, { name: string; role: Role }[]> = {}
+    for (const u of users) {
+      for (const aptId of u.apartmentIds ?? []) {
+        ;(m[aptId] ??= []).push({ name: u.name || u.email, role: u.role })
+      }
+    }
+    return m
+  }, [users])
 
   useEffect(() => {
     const initial: Record<string, Record<string, number>> = {}
@@ -95,6 +129,7 @@ export default function Millesimes() {
             <tr className="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-500">
               <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left">Διαμ.</th>
               <th className="px-3 py-2 text-left">Ιδιοκτήτης</th>
+              <th className="px-3 py-2 text-left">Χρήστες (αντιστοίχιση)</th>
               {scales.map((s) => (
                 <th key={s.key} className="px-3 py-2 text-right">
                   {s.label}
@@ -109,6 +144,20 @@ export default function Millesimes() {
                   {a.code}
                 </td>
                 <td className="px-3 py-1.5 text-gray-600">{a.ownerName}</td>
+                <td className="px-3 py-1.5">
+                  {(usersByApt[a.id] ?? []).length === 0 ? (
+                    <span className="text-xs text-gray-300">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {(usersByApt[a.id] ?? []).map((u, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-gray-700">
+                          {u.name}
+                          <Badge color={ROLE_BADGE[u.role]}>{ROLE_SHORT[u.role]}</Badge>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
                 {scales.map((s) => (
                   <td key={s.key} className="px-2 py-1 text-right">
                     <input
@@ -127,6 +176,7 @@ export default function Millesimes() {
           <tfoot>
             <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
               <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2">ΣΥΝΟΛΟ</td>
+              <td></td>
               <td></td>
               {scales.map((s) => (
                 <td key={s.key} className="tnum px-3 py-2 text-right">

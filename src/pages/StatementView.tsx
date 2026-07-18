@@ -45,6 +45,8 @@ export default function StatementView() {
   const activeGroups: ExpenseGroup[] = GROUP_ORDER.filter(
     (g) => (st.totals.byGroup[g] ?? 0) !== 0,
   )
+  // Στήλη «Έκδοση λογαριασμών» μόνο αν το κτίριο χρεώνει έκδοση (>0).
+  const showBilling = (st.totals.billingFees ?? 0) !== 0
   const linesByGroup = (g: ExpenseGroup) => st.expenseLines.filter((l) => l.group === g)
 
   async function issue() {
@@ -151,10 +153,12 @@ export default function StatementView() {
                 <div className="tnum font-semibold">{amount(st.totals.byGroup[g] ?? 0)}</div>
               </div>
             ))}
-            <div className="min-w-[110px] flex-1 px-3 py-1.5">
-              <div className="text-[9px] uppercase text-gray-500">Έκδοση λογ/σμών</div>
-              <div className="tnum font-semibold">{amount(st.totals.billingFees)}</div>
-            </div>
+            {showBilling && (
+              <div className="min-w-[110px] flex-1 px-3 py-1.5">
+                <div className="text-[9px] uppercase text-gray-500">Έκδοση λογ/σμών</div>
+                <div className="tnum font-semibold">{amount(st.totals.billingFees)}</div>
+              </div>
+            )}
             <div className="min-w-[120px] flex-1 bg-gray-50 px-3 py-1.5">
               <div className="text-[9px] uppercase text-gray-500">Γενικό σύνολο</div>
               <div className="tnum font-bold">{amount(st.totals.grandTotal)}</div>
@@ -200,7 +204,7 @@ export default function StatementView() {
                     {GROUP_LABELS[g]}
                   </th>
                 ))}
-                <th className="border border-gray-300 px-1 py-1">Έκδοση</th>
+                {showBilling && <th className="border border-gray-300 px-1 py-1">Έκδοση</th>}
                 <th className="border border-gray-300 px-1 py-1">Προηγ. υπόλ.</th>
                 <th className="border border-gray-300 px-1 py-1">Σύνολο περ.</th>
                 <th className="border border-gray-300 px-1 py-1">Γενικό σύνολο</th>
@@ -219,7 +223,7 @@ export default function StatementView() {
                     <th key={g} className="border border-gray-300 px-1">ποσό</th>
                   ),
                 )}
-                <th className="border border-gray-300"></th>
+                {showBilling && <th className="border border-gray-300"></th>}
                 <th className="border border-gray-300"></th>
                 <th className="border border-gray-300"></th>
                 <th className="border border-gray-300"></th>
@@ -248,7 +252,9 @@ export default function StatementView() {
                       </td>
                     )
                   })}
-                  <td className="border border-gray-300 px-1 tnum text-right">{amount(r.billingFee)}</td>
+                  {showBilling && (
+                    <td className="border border-gray-300 px-1 tnum text-right">{amount(r.billingFee)}</td>
+                  )}
                   <td className="border border-gray-300 px-1 tnum text-right">{amount(r.previousBalance)}</td>
                   <td className="border border-gray-300 px-1 tnum text-right">{amount(r.currentCharge)}</td>
                   <td className="border border-gray-300 px-1 tnum text-right font-semibold">{amount(r.total)}</td>
@@ -274,7 +280,9 @@ export default function StatementView() {
                     </td>
                   ),
                 )}
-                <td className="border border-gray-300 px-1 tnum text-right">{amount(st.totals.billingFees)}</td>
+                {showBilling && (
+                  <td className="border border-gray-300 px-1 tnum text-right">{amount(st.totals.billingFees)}</td>
+                )}
                 <td className="border border-gray-300"></td>
                 <td className="border border-gray-300"></td>
                 <td className="border border-gray-300 px-1 tnum text-right">{amount(st.totals.grandTotal)}</td>

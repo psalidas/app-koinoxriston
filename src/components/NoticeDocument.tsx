@@ -54,10 +54,12 @@ export function NoticeDocument({
               <td className="py-1 text-right tnum">{money(row.amounts[g] ?? 0)}</td>
             </tr>
           ))}
-          <tr className="border-t border-gray-100">
-            <td className="py-1 text-gray-600">Έκδοση λογαριασμού</td>
-            <td className="py-1 text-right tnum">{money(row.billingFee)}</td>
-          </tr>
+          {row.billingFee !== 0 && (
+            <tr className="border-t border-gray-100">
+              <td className="py-1 text-gray-600">Έκδοση λογαριασμού</td>
+              <td className="py-1 text-right tnum">{money(row.billingFee)}</td>
+            </tr>
+          )}
           <tr className="border-t border-gray-200">
             <td className="py-1 font-medium">Σύνολο περιόδου</td>
             <td className="py-1 text-right tnum font-medium">{money(row.currentCharge)}</td>

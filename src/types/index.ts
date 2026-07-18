@@ -152,6 +152,12 @@ export interface Expense {
   amount: number
   method: AllocationMethod
   scaleKey?: string // when method === 'millesime'
+  /**
+   * Διαμερίσματα που συμμετέχουν στη δαπάνη. Αν λείπει/κενό/null → συμμετέχουν
+   * ΟΛΑ (προεπιλογή). Αλλιώς η δαπάνη επιμερίζεται μόνο σε αυτά (με
+   * αναπροσαρμογή των χιλιοστών/βαρών μεταξύ τους).
+   */
+  participantApartmentIds?: string[] | null
   receiptUrl?: string
   receiptName?: string
   receiptPath?: string

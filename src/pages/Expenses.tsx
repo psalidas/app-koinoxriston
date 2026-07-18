@@ -23,6 +23,7 @@ type FormState = {
   amount: number
   method: AllocationMethod
   scaleKey: string
+  participantIds: string[] // διαμερίσματα που συμμετέχουν
   note: string
   receiptUrl?: string
   receiptName?: string
@@ -43,7 +44,11 @@ function quarterMonths(year: string, q: number): string[] {
 }
 
 export default function Expenses() {
-  const { building, refresh } = useAppData()
+  const { building, apartments, refresh } = useAppData()
+  const sortedApartments = useMemo(
+    () => [...apartments].sort((a, b) => a.orderNo - b.orderNo),
+    [apartments],
+  )
   const { isManager, user, profile } = useAuth()
   const scales = building?.scales ?? []
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -79,6 +84,7 @@ export default function Expenses() {
       amount: 0,
       method: 'millesime',
       scaleKey: scaleKey ?? 'genika',
+      participantIds: apartments.map((a) => a.id),
       note: '',
     }
   }
@@ -119,6 +125,10 @@ export default function Expenses() {
       amount: e.amount,
       method: e.method,
       scaleKey: e.scaleKey ?? scales[0]?.key ?? 'genika',
+      participantIds:
+        Array.isArray(e.participantApartmentIds) && e.participantApartmentIds.length > 0
+          ? e.participantApartmentIds
+          : apartments.map((a) => a.id),
       note: e.note ?? '',
       receiptUrl: e.receiptUrl,
       receiptName: e.receiptName,
@@ -161,6 +171,10 @@ export default function Expenses() {
 
   async function save() {
     if (!building) return
+    if (sortedApartments.length > 0 && form.participantIds.length === 0) {
+      alert('Επίλεξε τουλάχιστον ένα συμμετέχον διαμέρισμα.')
+      return
+    }
     setUploading(true)
     let receipt = {
       receiptUrl: form.receiptUrl,
@@ -190,6 +204,12 @@ export default function Expenses() {
       amount: Number(form.amount) || 0,
       method: form.method,
       scaleKey: form.method === 'millesime' || form.method === 'heating' ? form.scaleKey : undefined,
+      // Αν συμμετέχουν όλα → null (καθαρίζει τυχόν παλιό υποσύνολο σε επεξεργασία·
+      // σημαίνει «όλα»). Αλλιώς αποθηκεύουμε το υποσύνολο.
+      participantApartmentIds:
+        apartments.length > 0 && apartments.every((a) => form.participantIds.includes(a.id))
+          ? null
+          : form.participantIds,
       note: form.note.trim() || undefined,
       ...receipt,
     }
@@ -241,6 +261,23 @@ export default function Expenses() {
 
   const total = sorted.reduce((s, e) => s + e.amount, 0)
   const needsScale = form.method === 'millesime' || form.method === 'heating'
+
+  const allParticipating =
+    sortedApartments.length > 0 && sortedApartments.every((a) => form.participantIds.includes(a.id))
+  function toggleParticipant(id: string) {
+    setForm((f) => ({
+      ...f,
+      participantIds: f.participantIds.includes(id)
+        ? f.participantIds.filter((x) => x !== id)
+        : [...f.participantIds, id],
+    }))
+  }
+  function toggleAllParticipants() {
+    setForm((f) => ({
+      ...f,
+      participantIds: allParticipating ? [] : sortedApartments.map((a) => a.id),
+    }))
+  }
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -380,6 +417,12 @@ export default function Expenses() {
                   <span className="inline-flex items-center gap-1.5">
                     {e.category}
                     {e.chargeType === 'special' && <Badge color="amber">Έκτακτη</Badge>}
+                    {Array.isArray(e.participantApartmentIds) &&
+                      e.participantApartmentIds.length > 0 && (
+                        <Badge color="purple">
+                          {e.participantApartmentIds.length} διαμ.
+                        </Badge>
+                      )}
                     {e.receiptUrl && (
                       <a
                         href={e.receiptUrl}
@@ -505,6 +548,47 @@ export default function Expenses() {
               </SelectField>
             </Field>
           )}
+          <div className="sm:col-span-2">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">
+                Συμμετέχοντα διαμερίσματα{' '}
+                <span className="font-normal text-gray-400">
+                  ({form.participantIds.length}/{sortedApartments.length})
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={toggleAllParticipants}
+                className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              >
+                {allParticipating ? 'Κανένα' : 'Όλα'}
+              </button>
+            </div>
+            <p className="mb-1 text-xs text-gray-500">
+              Προεπιλογή: όλα συμμετέχουν. Ξετίκαρε όσα δεν συμμετέχουν — η δαπάνη επιμερίζεται μόνο
+              στα επιλεγμένα (με αναπροσαρμογή των χιλιοστών).
+            </p>
+            <div className="grid max-h-44 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-gray-200 p-2 sm:grid-cols-3">
+              {sortedApartments.map((a) => (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    className="shrink-0"
+                    checked={form.participantIds.includes(a.id)}
+                    onChange={() => toggleParticipant(a.id)}
+                  />
+                  <span className="font-medium">{a.code}</span>
+                  {a.ownerName && <span className="truncate text-gray-500">— {a.ownerName}</span>}
+                </label>
+              ))}
+            </div>
+            {form.participantIds.length === 0 && (
+              <p className="mt-1 text-xs text-red-600">Επίλεξε τουλάχιστον ένα διαμέρισμα.</p>
+            )}
+          </div>
           <div className="sm:col-span-2">
             <Field label="Σημείωση (προαιρετικό)">
               <TextField value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />

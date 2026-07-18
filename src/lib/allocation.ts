@@ -33,10 +33,18 @@ export interface ComputeResult {
  */
 function distribute(
   expense: Expense,
-  apartments: Apartment[],
+  allApartments: Apartment[],
   building: Building,
 ): Record<string, number> {
   const out: Record<string, number> = {}
+  // Συμμετέχοντα διαμερίσματα: αν οριστεί υποσύνολο, επιμερίζουμε μόνο σε αυτά
+  // (τα βάρη/χιλιοστά αναπροσαρμόζονται αυτόματα αφού το σύνολο υπολογίζεται
+  // πάνω στο υποσύνολο). Αν λείπει/κενό → όλα.
+  const ids = expense.participantApartmentIds
+  const apartments =
+    Array.isArray(ids) && ids.length > 0
+      ? allApartments.filter((a) => ids.includes(a.id))
+      : allApartments
   const n = apartments.length
   if (n === 0 || !expense.amount) return out
 

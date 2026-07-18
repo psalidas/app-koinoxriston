@@ -141,6 +141,27 @@ export default function StatementView() {
           <Info label="Πολυκατοικία" value={st.buildingName} />
         </div>
 
+        {/* Σύνολα ανά κατηγορία (σύνοψη) */}
+        <div className="mb-3 rounded border border-gray-300">
+          <div className="bg-gray-100 px-2 py-1 text-[10px] font-bold uppercase">Σύνολα ανά κατηγορία</div>
+          <div className="flex flex-wrap items-stretch divide-x divide-gray-200">
+            {activeGroups.map((g) => (
+              <div key={g} className="min-w-[110px] flex-1 px-3 py-1.5">
+                <div className="text-[9px] uppercase text-gray-500">{GROUP_LABELS[g]}</div>
+                <div className="tnum font-semibold">{amount(st.totals.byGroup[g] ?? 0)}</div>
+              </div>
+            ))}
+            <div className="min-w-[110px] flex-1 px-3 py-1.5">
+              <div className="text-[9px] uppercase text-gray-500">Έκδοση λογ/σμών</div>
+              <div className="tnum font-semibold">{amount(st.totals.billingFees)}</div>
+            </div>
+            <div className="min-w-[120px] flex-1 bg-gray-50 px-3 py-1.5">
+              <div className="text-[9px] uppercase text-gray-500">Γενικό σύνολο</div>
+              <div className="tnum font-bold">{amount(st.totals.grandTotal)}</div>
+            </div>
+          </div>
+        </div>
+
         {/* Expense breakdown */}
         <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {activeGroups.map((g) => (

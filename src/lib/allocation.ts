@@ -111,9 +111,9 @@ export function computeStatement(input: ComputeInput): ComputeResult {
   const expenseLines: StatementExpenseLine[] = []
 
   for (const exp of expenses) {
-    // Οι δαπάνες με χρέωση «Έκτακτη» εμφανίζονται στη στήλη «Ειδικές δαπάνες»
-    // της κύριας κατάστασης (ανεξάρτητα από την ομάδα τους).
-    const g: ExpenseGroup = exp.chargeType === 'special' ? 'eidikes' : exp.group
+    // Η κατηγορία/στήλη καθορίζεται από την ΟΜΑΔΑ της δαπάνης
+    // (Κοινόχρηστα, Ειδικές, Σε ίσα μέρη, Θέρμανση, Ασανσέρ, Ιδιοκτητών).
+    const g = exp.group
     expenseLines.push({ group: g, category: exp.category, amount: exp.amount })
     byGroup[g] = round2((byGroup[g] ?? 0) + exp.amount)
 

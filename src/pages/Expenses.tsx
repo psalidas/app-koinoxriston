@@ -6,7 +6,7 @@ import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, B
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { money, currentPeriod, formatDate } from '@/lib/format'
-import type { AllocationMethod, Expense, ExpenseChargeType, ExpenseGroup } from '@/types'
+import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
 import { uploadReceipt } from '@/lib/upload'
@@ -17,7 +17,6 @@ import { logAudit } from '@/lib/audit'
 type FormState = {
   period: string // YYYY-MM (μήνας δαπάνης)
   date: string // YYYY-MM-DD (ημ/νία παραστατικού, προαιρετικό)
-  chargeType: ExpenseChargeType
   group: ExpenseGroup
   category: string
   amount: number
@@ -78,7 +77,6 @@ export default function Expenses() {
     return {
       period: currentPeriod(),
       date: '',
-      chargeType: 'period',
       group: 'koinoxrista',
       category: '',
       amount: 0,
@@ -119,7 +117,6 @@ export default function Expenses() {
     setForm({
       period: e.period,
       date: e.date ?? '',
-      chargeType: e.chargeType ?? 'period',
       group: e.group,
       category: e.category,
       amount: e.amount,
@@ -198,7 +195,6 @@ export default function Expenses() {
       buildingId: building.id,
       period: form.period,
       date: form.date || undefined,
-      chargeType: form.chargeType,
       group: form.group,
       category: form.category.trim(),
       amount: Number(form.amount) || 0,
@@ -416,7 +412,6 @@ export default function Expenses() {
                 <td className="px-3 py-2 font-medium text-gray-900">
                   <span className="inline-flex items-center gap-1.5">
                     {e.category}
-                    {e.chargeType === 'special' && <Badge color="amber">Έκτακτη</Badge>}
                     {Array.isArray(e.participantApartmentIds) &&
                       e.participantApartmentIds.length > 0 && (
                         <Badge color="purple">
@@ -503,15 +498,6 @@ export default function Expenses() {
           </Field>
           <Field label="Ημ/νία παραστατικού (προαιρετικό)">
             <TextField type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-          </Field>
-          <Field label="Χρέωση" hint="«Έκτακτη» → δεν μπαίνει στη μηνιαία έκδοση· κατανέμεται σε έκτακτη.">
-            <SelectField
-              value={form.chargeType}
-              onChange={(e) => setForm({ ...form, chargeType: e.target.value as ExpenseChargeType })}
-            >
-              <option value="period">Περιόδου</option>
-              <option value="special">Έκτακτη</option>
-            </SelectField>
           </Field>
           <Field label="Κατηγορία">
             <TextField value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />

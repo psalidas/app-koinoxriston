@@ -111,13 +111,16 @@ export function computeStatement(input: ComputeInput): ComputeResult {
   const expenseLines: StatementExpenseLine[] = []
 
   for (const exp of expenses) {
-    expenseLines.push({ group: exp.group, category: exp.category, amount: exp.amount })
-    byGroup[exp.group] = round2((byGroup[exp.group] ?? 0) + exp.amount)
+    // Οι δαπάνες με χρέωση «Έκτακτη» εμφανίζονται στη στήλη «Ειδικές δαπάνες»
+    // της κύριας κατάστασης (ανεξάρτητα από την ομάδα τους).
+    const g: ExpenseGroup = exp.chargeType === 'special' ? 'eidikes' : exp.group
+    expenseLines.push({ group: g, category: exp.category, amount: exp.amount })
+    byGroup[g] = round2((byGroup[g] ?? 0) + exp.amount)
 
     const shares = distribute(exp, apartments, building)
     for (const a of apartments) {
       const s = shares[a.id] ?? 0
-      perApt[a.id][exp.group] = round2((perApt[a.id][exp.group] ?? 0) + s)
+      perApt[a.id][g] = round2((perApt[a.id][g] ?? 0) + s)
     }
   }
 

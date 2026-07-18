@@ -65,9 +65,8 @@ export default function StatementView() {
         listStatements(building.id),
         listPayments(building.id),
       ])
-      const selected = expenses.filter(
-        (e) => e.period >= from && e.period <= to && (e.chargeType ?? 'period') !== 'special',
-      )
+      // Όλες οι δαπάνες της περιόδου· οι «Έκτακτες» πάνε στη στήλη «Ειδικές δαπάνες».
+      const selected = expenses.filter((e) => e.period >= from && e.period <= to)
       const prior = allStatements.filter(
         (s) => s.status === 'issued' && s.id !== st.id && s.period < to,
       )

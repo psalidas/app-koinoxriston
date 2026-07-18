@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileSpreadsheet, Plus, Trash2, ChevronRight } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
@@ -7,8 +7,7 @@ import { Button, Card, PageHeader, Field, TextField, Badge } from '@/components/
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { money, currentPeriod, formatPeriod, formatDate } from '@/lib/format'
-import type { Expense, Statement } from '@/types'
-import { GROUP_LABELS } from '@/types'
+import type { Statement } from '@/types'
 import { listStatements, createStatement, deleteStatement } from '@/lib/repos/statements'
 import { listExpenses } from '@/lib/repos/expenses'
 import { listPayments } from '@/lib/repos/payments'
@@ -16,20 +15,15 @@ import { computeStatement } from '@/lib/allocation'
 import { balancesByApartment } from '@/lib/balances'
 import { logAudit } from '@/lib/audit'
 
-type Kind = 'period' | 'special'
-
 export default function Statements() {
   const { building, apartments, refresh } = useAppData()
   const { isManager, user, profile } = useAuth()
   const navigate = useNavigate()
   const [statements, setStatements] = useState<Statement[]>([])
   const [modalOpen, setModalOpen] = useState(false)
-  const [kind, setKind] = useState<Kind>('period')
   const [fromP, setFromP] = useState(currentPeriod())
   const [toP, setToP] = useState(currentPeriod())
   const [periodLabel, setPeriodLabel] = useState('')
-  const [allExpenses, setAllExpenses] = useState<Expense[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [toDelete, setToDelete] = useState<Statement | null>(null)
 
@@ -44,36 +38,11 @@ export default function Statements() {
   }, [building])
 
   function openNew() {
-    setKind('period')
     setFromP(currentPeriod())
     setToP(currentPeriod())
     setPeriodLabel('')
-    setSelectedIds(new Set())
     setModalOpen(true)
-    if (building) void listExpenses(building.id).then(setAllExpenses)
   }
-
-  // Έκτακτο: επιλογή μόνο από δαπάνες με χρέωση «Έκτακτη» (πιο πρόσφατες πρώτα).
-  const pickable = useMemo(
-    () =>
-      allExpenses
-        .filter((e) => e.chargeType === 'special')
-        .sort((a, b) => (a.period < b.period ? 1 : -1)),
-    [allExpenses],
-  )
-
-  function toggleExpense(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const selectedTotal = pickable
-    .filter((e) => selectedIds.has(e.id))
-    .reduce((s, e) => s + (e.amount || 0), 0)
 
   async function generate() {
     if (!building) return
@@ -85,33 +54,17 @@ export default function Statements() {
         listPayments(building.id),
       ])
 
-      let selected: Expense[]
-      let anchor: string
-      let label: string
-      let previousBalances: Record<string, number>
-      let from: string | undefined
-      let to: string | undefined
-
-      if (kind === 'special') {
-        selected = expenses.filter((e) => selectedIds.has(e.id))
-        if (selected.length === 0) {
-          setBusy(false)
-          return
-        }
-        anchor = selected.reduce((m, e) => (e.period > m ? e.period : m), currentPeriod())
-        label = periodLabel.trim() || 'Έκτακτη κατανομή'
-        previousBalances = {} // έκτακτη: χωρίς μεταφορά προηγ. υπολοίπου
-      } else {
-        from = fromP <= toP ? fromP : toP
-        to = fromP <= toP ? toP : fromP
-        selected = expenses.filter(
-          (e) => e.period >= from! && e.period <= to! && (e.chargeType ?? 'period') !== 'special',
-        )
-        anchor = to
-        label = periodLabel.trim() || (from === to ? formatPeriod(from) : `${formatPeriod(from)} – ${formatPeriod(to)}`)
-        const prior = allStatements.filter((s) => s.status === 'issued' && s.period < to!)
-        previousBalances = balancesByApartment(prior, payments)
-      }
+      const from = fromP <= toP ? fromP : toP
+      const to = fromP <= toP ? toP : fromP
+      // Όλες οι δαπάνες της περιόδου — οι «Έκτακτες» εμφανίζονται στη στήλη
+      // «Ειδικές δαπάνες» της ίδιας κατάστασης.
+      const selected = expenses.filter((e) => e.period >= from && e.period <= to)
+      const anchor = to
+      const label =
+        periodLabel.trim() ||
+        (from === to ? formatPeriod(from) : `${formatPeriod(from)} – ${formatPeriod(to)}`)
+      const prior = allStatements.filter((s) => s.status === 'issued' && s.period < to)
+      const previousBalances = balancesByApartment(prior, payments)
 
       const { rows, totals, expenseLines } = computeStatement({
         building,
@@ -127,7 +80,7 @@ export default function Statements() {
         managerName: building.managerName,
         period: anchor,
         periodLabel: label,
-        kind,
+        kind: 'period',
         periodFrom: from,
         periodTo: to,
         status: 'draft',
@@ -143,7 +96,7 @@ export default function Statements() {
         action: 'create',
         entity: 'statement',
         entityId: id,
-        context: { kind, period: anchor, grandTotal: totals.grandTotal },
+        context: { period: anchor, grandTotal: totals.grandTotal },
       })
       setModalOpen(false)
       await refresh()
@@ -159,8 +112,6 @@ export default function Statements() {
     setToDelete(null)
     await load()
   }
-
-  const canGenerate = kind === 'special' ? selectedIds.size > 0 : true
 
   return (
     <div>
@@ -229,98 +180,42 @@ export default function Statements() {
             <Button variant="secondary" onClick={() => setModalOpen(false)}>
               Ακύρωση
             </Button>
-            <Button onClick={generate} disabled={busy || !canGenerate}>
+            <Button onClick={generate} disabled={busy}>
               {busy ? 'Υπολογισμός…' : 'Δημιουργία'}
             </Button>
           </>
         }
       >
         <div className="space-y-3">
-          {/* Τύπος */}
-          <Field label="Τύπος">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => setKind('period')}
-                className={`rounded-md py-1.5 font-medium ${kind === 'period' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-              >
-                Περιόδου
-              </button>
-              <button
-                type="button"
-                onClick={() => setKind('special')}
-                className={`rounded-md py-1.5 font-medium ${kind === 'special' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
-              >
-                Έκτακτο
-              </button>
-            </div>
-          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Από" hint="Μήνας έναρξης.">
+              <input
+                type="month"
+                value={fromP}
+                onChange={(e) => setFromP(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </Field>
+            <Field label="Έως" hint="Ίδιο με «Από» για μεμονωμένο μήνα.">
+              <input
+                type="month"
+                value={toP}
+                onChange={(e) => setToP(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              />
+            </Field>
+          </div>
 
-          {kind === 'period' ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Από" hint="Μήνας έναρξης.">
-                <input
-                  type="month"
-                  value={fromP}
-                  onChange={(e) => setFromP(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-              </Field>
-              <Field label="Έως" hint="Ίδιο με «Από» για μεμονωμένο μήνα.">
-                <input
-                  type="month"
-                  value={toP}
-                  onChange={(e) => setToP(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-              </Field>
-            </div>
-          ) : (
-            <div>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Δαπάνες προς κατανομή</span>
-                <span className="tnum text-gray-500">
-                  {selectedIds.size} επιλεγμένες · {money(selectedTotal)}
-                </span>
-              </div>
-              <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200">
-                {pickable.length === 0 ? (
-                  <p className="px-3 py-4 text-center text-sm text-gray-400">
-                    Καμία δαπάνη με χρέωση «Έκτακτη». Όρισέ το στη δαπάνη.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-gray-100">
-                    {pickable.map((e) => (
-                      <li key={e.id}>
-                        <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 shrink-0"
-                            checked={selectedIds.has(e.id)}
-                            onChange={() => toggleExpense(e.id)}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-gray-800">{e.category}</span>
-                          <span className="shrink-0 text-xs text-gray-400">
-                            {GROUP_LABELS[e.group]} · {formatPeriod(e.period)}
-                          </span>
-                          <span className="tnum shrink-0 text-gray-600">{money(e.amount)}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                Εμφανίζονται μόνο δαπάνες με χρέωση «Έκτακτη». Χωρίς μεταφορά προηγούμενου υπολοίπου.
-              </p>
-            </div>
-          )}
+          <p className="rounded-md bg-blue-50 p-2 text-xs text-blue-700">
+            Περιλαμβάνονται όλες οι δαπάνες της περιόδου. Όσες έχουν χρέωση «Έκτακτη»
+            εμφανίζονται στη στήλη «Ειδικές δαπάνες» της κατάστασης.
+          </p>
 
-          <Field label="Ετικέτα / τίτλος (προαιρετικό)" hint="π.χ. «Έκτακτη — Επισκευή στέγης» ή «1/6–31/12/2025»">
+          <Field label="Ετικέτα / τίτλος (προαιρετικό)" hint="π.χ. «1/6–31/12/2025»">
             <TextField
               value={periodLabel}
               onChange={(e) => setPeriodLabel(e.target.value)}
-              placeholder={kind === 'special' ? 'Έκτακτη κατανομή' : formatPeriod(toP)}
+              placeholder={formatPeriod(toP)}
             />
           </Field>
         </div>

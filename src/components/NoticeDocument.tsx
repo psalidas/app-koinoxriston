@@ -25,6 +25,8 @@ export function NoticeDocument({
   const buildingMille = (scaleKey: string) =>
     st.rows.reduce((s, r) => s + (r.millesimes[scaleKey] ?? 0), 0)
   const linesByGroup = (g: ExpenseGroup) => st.expenseLines.filter((l) => l.group === g)
+  // Εμφανίζουμε μόνο κατηγορίες με έξοδο (χωρίς κενές γραμμές).
+  const noticeGroups: ExpenseGroup[] = GROUP_ORDER.filter((g) => (st.totals.byGroup[g] ?? 0) !== 0)
 
   const cell = 'border border-gray-400 px-1 py-0.5'
 
@@ -72,23 +74,31 @@ export function NoticeDocument({
       </div>
 
       {/* Ανάλυση εξόδων κατά κατηγορία */}
-      <table className="w-full border-x border-b border-gray-400 text-[10px]">
+      <table className="w-full table-fixed border-x border-b border-gray-400 text-[10px]">
+        <colgroup>
+          <col style={{ width: '16%' }} />
+          <col />
+          <col style={{ width: '13%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '11%' }} />
+          <col style={{ width: '13%' }} />
+        </colgroup>
         <thead>
           <tr className="bg-gray-100 text-center">
             <th className={`${cell} text-left`}>Κατηγορία</th>
             <th className={`${cell} text-left`}>Ανάλυση εξόδων</th>
-            <th className={cell}>Σύνολο εξόδων</th>
-            <th className={cell}>Χιλ. διαμ/τος</th>
-            <th className={cell}>Χιλ. πολ/κίας</th>
-            <th className={cell}>Χρέωση διαμ/τος</th>
+            <th className={cell}>Σύνολο</th>
+            <th className={cell}>Χιλ. δ/τος</th>
+            <th className={cell}>Χιλ. πολ.</th>
+            <th className={cell}>Χρέωση</th>
           </tr>
         </thead>
         <tbody>
-          {GROUP_ORDER.map((g) => {
+          {noticeGroups.map((g, idx) => {
             const scaleKey = GROUP_SCALE_KEY[g]
             const lines = linesByGroup(g)
             return (
-              <tr key={g} className="align-top">
+              <tr key={g} className="align-top" style={idx % 2 === 1 ? { backgroundColor: '#f1f3f5' } : undefined}>
                 <td className={`${cell} font-semibold`}>{GROUP_LABELS[g]}</td>
                 <td className={cell}>
                   {lines.map((l, i) => (
@@ -105,7 +115,7 @@ export function NoticeDocument({
                 <td className={`${cell} text-right tnum`}>
                   {scaleKey ? mille(buildingMille(scaleKey)) : '—'}
                 </td>
-                <td className={`${cell} text-right tnum`}>{amount(row.amounts[g] ?? 0)}</td>
+                <td className={`${cell} text-right tnum font-medium`}>{amount(row.amounts[g] ?? 0)}</td>
               </tr>
             )
           })}
@@ -116,18 +126,16 @@ export function NoticeDocument({
               <td className={`${cell} text-right tnum`}>{amount(st.totals.billingFees)}</td>
               <td className={cell}></td>
               <td className={cell}></td>
-              <td className={`${cell} text-right tnum`}>{amount(row.billingFee)}</td>
+              <td className={`${cell} text-right tnum font-medium`}>{amount(row.billingFee)}</td>
             </tr>
           )}
-        </tbody>
-        <tfoot>
-          <tr className="bg-gray-100 font-bold">
+          <tr className="bg-gray-200 font-bold">
             <td className={cell} colSpan={5}>
               ΣΥΝΟΛΟ ΠΕΡΙΟΔΟΥ
             </td>
             <td className={`${cell} text-right tnum`}>{amount(row.currentCharge)}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
 
       {/* Προηγούμενες οφειλές & πληρωτέο */}

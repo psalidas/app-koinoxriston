@@ -62,6 +62,7 @@ const MANAGER_NAV: NavItem[] = [
 const RESIDENT_NAV: NavItem[] = [
   { to: '/portal', label: 'Πίνακας ελέγχου', icon: LayoutDashboard },
   { to: '/my-profile', label: 'Τα στοιχεία μου', icon: IdCard },
+  { to: '/finances', label: 'Οικονομικά κτιρίου', icon: PiggyBank },
   { to: '/announcements', label: 'Ανακοινώσεις', icon: Megaphone },
   { to: '/works', label: 'Εργασίες', icon: Hammer },
   { to: '/topics', label: 'Συζήτηση', icon: MessagesSquare },

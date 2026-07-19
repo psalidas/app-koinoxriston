@@ -120,6 +120,9 @@ export default function StatementView() {
           <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/notices`)}>
             <Printer size={18} /> Όλα τα ειδοποιητήρια
           </Button>
+          <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/receipts`)}>
+            <Printer size={18} /> Όλες οι αποδείξεις
+          </Button>
           {isManager && st.status !== 'issued' && st.kind !== 'special' && (
             <Button variant="secondary" onClick={refreshDraft} disabled={busy}>
               <RefreshCw size={18} /> {busy ? 'Ανανέωση…' : 'Ανανέωση'}
@@ -338,6 +341,23 @@ export default function StatementView() {
             <Link
               key={r.apartmentId}
               to={`/statements/${st.id}/notice/${r.apartmentId}`}
+              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-blue-300"
+            >
+              <span className="font-medium text-gray-900">{r.code}</span>
+              <span className="tnum text-gray-500">{amount(r.total)}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Αποδείξεις Ενοίκου / Ιδιοκτήτη */}
+      <div className="no-print mt-6">
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Αποδείξεις Ενοίκου / Ιδιοκτήτη</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {st.rows.map((r) => (
+            <Link
+              key={r.apartmentId}
+              to={`/statements/${st.id}/receipt/${r.apartmentId}`}
               className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-blue-300"
             >
               <span className="font-medium text-gray-900">{r.code}</span>

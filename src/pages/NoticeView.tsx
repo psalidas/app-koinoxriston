@@ -61,7 +61,7 @@ export default function NoticeView() {
       </div>
 
       <div className="print-area rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <NoticeDocument st={st} row={row} iban={iban} qr={qr} />
+        <NoticeDocument st={st} row={row} iban={iban} qr={qr} area={building?.area} />
       </div>
     </div>
   )

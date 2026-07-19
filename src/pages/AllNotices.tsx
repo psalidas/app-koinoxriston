@@ -70,7 +70,7 @@ export default function AllNotices() {
             key={row.apartmentId}
             className="print-page print-area rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
           >
-            <NoticeDocument st={st} row={row} iban={iban} qr={qrs[row.apartmentId] ?? null} />
+            <NoticeDocument st={st} row={row} iban={iban} qr={qrs[row.apartmentId] ?? null} area={building?.area} />
           </div>
         ))}
       </div>

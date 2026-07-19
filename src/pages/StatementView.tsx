@@ -51,6 +51,13 @@ export default function StatementView() {
   const showBilling = (st.totals.billingFees ?? 0) !== 0
   const linesByGroup = (g: ExpenseGroup) => st.expenseLines.filter((l) => l.group === g)
 
+  // Αθροίσματα στηλών (χιλιοστά + ποσά) για τη γραμμή «ΣΥΝΟΛΑ».
+  const milleTotal = (scaleKey: string) => st.rows.reduce((s, r) => s + (r.millesimes[scaleKey] ?? 0), 0)
+  const groupTotal = (g: ExpenseGroup) => st.rows.reduce((s, r) => s + (r.amounts[g] ?? 0), 0)
+  const prevTotal = st.rows.reduce((s, r) => s + r.previousBalance, 0)
+  const chargeTotal = st.rows.reduce((s, r) => s + r.currentCharge, 0)
+  const rowsGrandTotal = st.rows.reduce((s, r) => s + r.total, 0)
+
   async function issue() {
     if (!st) return
     await markIssued(st.id, user?.email ?? '')
@@ -195,7 +202,27 @@ export default function StatementView() {
 
         {/* Main allocation table */}
         <div className="overflow-x-auto">
-          <table className="w-full border border-gray-300 text-[10px]">
+          <table className="w-full table-fixed border border-gray-300 text-[10px]">
+            <colgroup>
+              <col style={{ width: '2rem' }} />
+              <col style={{ width: '9rem' }} />
+              <col style={{ width: '2.5rem' }} />
+              {activeGroups.map((g) =>
+                GROUP_SCALE_KEY[g] ? (
+                  <Fragment key={g}>
+                    <col />
+                    <col />
+                  </Fragment>
+                ) : (
+                  // «Δαπάνες σε ίσα μέρη» — στενότερη στήλη
+                  <col key={g} style={{ width: '3rem' }} />
+                ),
+              )}
+              {showBilling && <col style={{ width: '3rem' }} />}
+              <col />
+              <col />
+              <col />
+            </colgroup>
             <thead>
               <tr className="bg-gray-100 text-center">
                 <th className="border border-gray-300 px-1 py-1">Α/Α</th>
@@ -233,9 +260,9 @@ export default function StatementView() {
             </thead>
             <tbody>
               {st.rows.map((r, idx) => (
-                <tr key={r.apartmentId} className="text-center">
+                <tr key={r.apartmentId} className={`text-center ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
                   <td className="border border-gray-300 px-1 tnum">{String(idx + 1).padStart(3, '0')}</td>
-                  <td className="border border-gray-300 px-2 text-left">{r.ownerName}</td>
+                  <td className="border border-gray-300 px-2 text-left leading-tight break-words">{r.ownerName}</td>
                   <td className="border border-gray-300 px-1 font-medium">{r.code}</td>
                   {activeGroups.map((g) => {
                     const scaleKey = GROUP_SCALE_KEY[g]
@@ -268,26 +295,25 @@ export default function StatementView() {
                 <td className="border border-gray-300 px-1" colSpan={3}>
                   ΣΥΝΟΛΑ
                 </td>
-                {activeGroups.map((g) =>
-                  GROUP_SCALE_KEY[g] ? (
+                {activeGroups.map((g) => {
+                  const scaleKey = GROUP_SCALE_KEY[g]
+                  return scaleKey ? (
                     <Fragment key={g}>
-                      <td className="border border-gray-300"></td>
-                      <td className="border border-gray-300 px-1 tnum text-right">
-                        {amount(st.totals.byGroup[g] ?? 0)}
-                      </td>
+                      <td className="border border-gray-300 px-1 tnum">{mille(milleTotal(scaleKey))}</td>
+                      <td className="border border-gray-300 px-1 tnum text-right">{amount(groupTotal(g))}</td>
                     </Fragment>
                   ) : (
                     <td key={g} className="border border-gray-300 px-1 tnum text-right">
-                      {amount(st.totals.byGroup[g] ?? 0)}
+                      {amount(groupTotal(g))}
                     </td>
-                  ),
-                )}
+                  )
+                })}
                 {showBilling && (
                   <td className="border border-gray-300 px-1 tnum text-right">{amount(st.totals.billingFees)}</td>
                 )}
-                <td className="border border-gray-300"></td>
-                <td className="border border-gray-300"></td>
-                <td className="border border-gray-300 px-1 tnum text-right">{amount(st.totals.grandTotal)}</td>
+                <td className="border border-gray-300 px-1 tnum text-right">{amount(prevTotal)}</td>
+                <td className="border border-gray-300 px-1 tnum text-right">{amount(chargeTotal)}</td>
+                <td className="border border-gray-300 px-1 tnum text-right">{amount(rowsGrandTotal)}</td>
               </tr>
             </tfoot>
           </table>

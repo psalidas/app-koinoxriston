@@ -42,8 +42,10 @@ export default function StatementView() {
   if (loading) return <div className="text-gray-400">Φόρτωση…</div>
   if (!st) return <div className="text-gray-500">Η έκδοση δεν βρέθηκε.</div>
 
+  // Η στήλη «Ειδικές δαπάνες» εμφανίζεται πάντα (σταθερή στήλη), όπως και οι
+  // κατηγορίες που έχουν ποσό.
   const activeGroups: ExpenseGroup[] = GROUP_ORDER.filter(
-    (g) => (st.totals.byGroup[g] ?? 0) !== 0,
+    (g) => g === 'eidikes' || (st.totals.byGroup[g] ?? 0) !== 0,
   )
   // Στήλη «Έκδοση λογαριασμών» μόνο αν το κτίριο χρεώνει έκδοση (>0).
   const showBilling = (st.totals.billingFees ?? 0) !== 0

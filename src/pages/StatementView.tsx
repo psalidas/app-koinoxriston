@@ -204,9 +204,9 @@ export default function StatementView() {
         <div className="overflow-x-auto">
           <table className="w-full table-fixed border border-gray-300 text-[10px]">
             <colgroup>
-              <col style={{ width: '2rem' }} />
-              <col style={{ width: '9rem' }} />
-              <col style={{ width: '2.5rem' }} />
+              <col style={{ width: '1.8rem' }} />
+              <col style={{ width: '7rem' }} />
+              <col style={{ width: '2.2rem' }} />
               {activeGroups.map((g) =>
                 GROUP_SCALE_KEY[g] ? (
                   <Fragment key={g}>
@@ -214,8 +214,8 @@ export default function StatementView() {
                     <col />
                   </Fragment>
                 ) : (
-                  // «Δαπάνες σε ίσα μέρη» — στενότερη στήλη
-                  <col key={g} style={{ width: '3rem' }} />
+                  // «Δαπάνες σε ίσα μέρη» — λίγο στενότερη στήλη
+                  <col key={g} style={{ width: '4.5rem' }} />
                 ),
               )}
               {showBilling && <col style={{ width: '3rem' }} />}
@@ -260,7 +260,7 @@ export default function StatementView() {
             </thead>
             <tbody>
               {st.rows.map((r, idx) => (
-                <tr key={r.apartmentId} className={`text-center ${idx % 2 === 1 ? 'bg-gray-50' : ''}`}>
+                <tr key={r.apartmentId} className={`text-center ${idx % 2 === 1 ? 'bg-gray-100' : ''}`}>
                   <td className="border border-gray-300 px-1 tnum">{String(idx + 1).padStart(3, '0')}</td>
                   <td className="border border-gray-300 px-2 text-left leading-tight break-words">{r.ownerName}</td>
                   <td className="border border-gray-300 px-1 font-medium">{r.code}</td>
@@ -289,9 +289,9 @@ export default function StatementView() {
                   <td className="border border-gray-300 px-1 tnum text-right font-semibold">{amount(r.total)}</td>
                 </tr>
               ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-100 text-center font-bold">
+              {/* ΣΥΝΟΛΑ ως τελευταία γραμμή του σώματος — εμφανίζεται μία φορά στο
+                  τέλος (το tfoot επαναλαμβανόταν σε κάθε σελίδα εκτύπωσης). */}
+              <tr className="bg-gray-200 text-center font-bold" style={{ breakInside: 'avoid' }}>
                 <td className="border border-gray-300 px-1" colSpan={3}>
                   ΣΥΝΟΛΑ
                 </td>
@@ -315,7 +315,7 @@ export default function StatementView() {
                 <td className="border border-gray-300 px-1 tnum text-right">{amount(chargeTotal)}</td>
                 <td className="border border-gray-300 px-1 tnum text-right">{amount(rowsGrandTotal)}</td>
               </tr>
-            </tfoot>
+            </tbody>
           </table>
         </div>
 

@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { money, currentPeriod, formatDate } from '@/lib/format'
+import { money, currentPeriod, formatDate, formatPeriod } from '@/lib/format'
 import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
@@ -29,7 +29,7 @@ type FormState = {
 }
 
 type ViewMode = 'month' | 'quarter' | 'year' | 'range'
-type SortKey = 'code' | 'date' | 'category' | 'amount'
+type SortKey = 'code' | 'period' | 'date' | 'category' | 'amount'
 
 const thisYear = () => currentPeriod().slice(0, 4)
 const displayDate = (e: Expense): string =>
@@ -250,6 +250,7 @@ export default function Expenses() {
       if (sortKey === 'amount') cmp = (a.amount || 0) - (b.amount || 0)
       else if (sortKey === 'category') cmp = a.category.localeCompare(b.category, 'el')
       else if (sortKey === 'code') cmp = (a.code ?? '').localeCompare(b.code ?? '', 'el')
+      else if (sortKey === 'period') cmp = (a.period ?? '').localeCompare(b.period ?? '')
       else cmp = dateKey(a).localeCompare(dateKey(b))
       return cmp * dir
     })
@@ -388,6 +389,7 @@ export default function Expenses() {
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase text-gray-500">
               <Th k="code" label="Κωδ." />
+              <Th k="period" label="Μήνας" />
               <Th k="date" label="Ημ/νία" />
               <Th k="category" label="Κατηγορία" />
               <th className="px-3 py-2">Ομάδα</th>
@@ -399,7 +401,7 @@ export default function Expenses() {
           <tbody>
             {sorted.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                   Δεν υπάρχουν δαπάνες για την επιλεγμένη προβολή.
                 </td>
               </tr>
@@ -407,7 +409,8 @@ export default function Expenses() {
             {sorted.map((e) => (
               <tr key={e.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 tnum text-xs text-gray-500">{e.code ?? '—'}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-600">{displayDate(e)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatPeriod(e.period)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500">{displayDate(e)}</td>
                 <td className="px-3 py-2 font-medium text-gray-900">
                   <span className="inline-flex items-center gap-1.5">
                     {e.category}
@@ -459,7 +462,7 @@ export default function Expenses() {
           {sorted.length > 0 && (
             <tfoot>
               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                <td className="px-3 py-2" colSpan={5}>
+                <td className="px-3 py-2" colSpan={6}>
                   ΣΥΝΟΛΟ ({sorted.length})
                 </td>
                 <td className="px-3 py-2 text-right tnum">{money(total)}</td>

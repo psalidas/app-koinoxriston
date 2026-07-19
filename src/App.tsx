@@ -12,6 +12,7 @@ import Statements from './pages/Statements'
 import StatementView from './pages/StatementView'
 import NoticeView from './pages/NoticeView'
 import AllNotices from './pages/AllNotices'
+import Receipts from './pages/Receipts'
 import Payments from './pages/Payments'
 import ApartmentLedger from './pages/ApartmentLedger'
 import Fund from './pages/Fund'
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/works" element={<Works />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/statements/:id/notice/:apartmentId" element={<NoticeView />} />
+        <Route path="/statements/:id/receipt/:apartmentId" element={<Receipts />} />
 
         {/* Manager-only */}
         <Route element={<ManagerOutlet />}>
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="/statements" element={<Statements />} />
           <Route path="/statements/:id" element={<StatementView />} />
           <Route path="/statements/:id/notices" element={<AllNotices />} />
+          <Route path="/statements/:id/receipts" element={<Receipts />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/apartments/:id/ledger" element={<ApartmentLedger />} />
           <Route path="/fund" element={<Fund />} />

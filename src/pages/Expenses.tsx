@@ -7,7 +7,7 @@ import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { money, currentPeriod, formatDate } from '@/lib/format'
 import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
-import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER } from '@/types'
+import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
 import { uploadReceipt } from '@/lib/upload'
 import { analyzeReceipt } from '@/lib/ocr'
@@ -21,7 +21,6 @@ type FormState = {
   category: string
   amount: number
   method: AllocationMethod
-  scaleKey: string
   participantIds: string[] // διαμερίσματα που συμμετέχουν
   note: string
   receiptUrl?: string
@@ -49,7 +48,6 @@ export default function Expenses() {
     [apartments],
   )
   const { isManager, user, profile } = useAuth()
-  const scales = building?.scales ?? []
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -71,9 +69,9 @@ export default function Expenses() {
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiMsg, setAiMsg] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(blankForm(scales[0]?.key))
+  const [form, setForm] = useState<FormState>(blankForm())
 
-  function blankForm(scaleKey?: string): FormState {
+  function blankForm(): FormState {
     return {
       period: currentPeriod(),
       date: '',
@@ -81,7 +79,6 @@ export default function Expenses() {
       category: '',
       amount: 0,
       method: 'millesime',
-      scaleKey: scaleKey ?? 'genika',
       participantIds: apartments.map((a) => a.id),
       note: '',
     }
@@ -106,7 +103,7 @@ export default function Expenses() {
     setEditing(null)
     setFile(null)
     setAiMsg(null)
-    setForm(blankForm(scales[0]?.key))
+    setForm(blankForm())
     setModalOpen(true)
   }
 
@@ -121,7 +118,6 @@ export default function Expenses() {
       category: e.category,
       amount: e.amount,
       method: e.method,
-      scaleKey: e.scaleKey ?? scales[0]?.key ?? 'genika',
       participantIds:
         Array.isArray(e.participantApartmentIds) && e.participantApartmentIds.length > 0
           ? e.participantApartmentIds
@@ -199,7 +195,11 @@ export default function Expenses() {
       category: form.category.trim(),
       amount: Number(form.amount) || 0,
       method: form.method,
-      scaleKey: form.method === 'millesime' || form.method === 'heating' ? form.scaleKey : undefined,
+      // Η κλίμακα χιλιοστών προκύπτει αυτόματα από την ομάδα της δαπάνης.
+      scaleKey:
+        form.method === 'millesime' || form.method === 'heating'
+          ? GROUP_SCALE_KEY[form.group] ?? undefined
+          : undefined,
       // Αν συμμετέχουν όλα → null (καθαρίζει τυχόν παλιό υποσύνολο σε επεξεργασία·
       // σημαίνει «όλα»). Αλλιώς αποθηκεύουμε το υποσύνολο.
       participantApartmentIds:
@@ -256,7 +256,6 @@ export default function Expenses() {
   }, [filtered, sortKey, sortDir])
 
   const total = sorted.reduce((s, e) => s + e.amount, 0)
-  const needsScale = form.method === 'millesime' || form.method === 'heating'
 
   const allParticipating =
     sortedApartments.length > 0 && sortedApartments.every((a) => form.participantIds.includes(a.id))
@@ -523,17 +522,6 @@ export default function Expenses() {
               ))}
             </SelectField>
           </Field>
-          {needsScale && (
-            <Field label="Πίνακας χιλιοστών">
-              <SelectField value={form.scaleKey} onChange={(e) => setForm({ ...form, scaleKey: e.target.value })}>
-                {scales.map((s) => (
-                  <option key={s.key} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </SelectField>
-            </Field>
-          )}
           <div className="sm:col-span-2">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">

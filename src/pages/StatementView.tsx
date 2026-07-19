@@ -260,7 +260,11 @@ export default function StatementView() {
             </thead>
             <tbody>
               {st.rows.map((r, idx) => (
-                <tr key={r.apartmentId} className={`text-center ${idx % 2 === 1 ? 'bg-gray-100' : ''}`}>
+                <tr
+                  key={r.apartmentId}
+                  className="text-center"
+                  style={idx % 2 === 1 ? { backgroundColor: '#dfe3e8' } : undefined}
+                >
                   <td className="border border-gray-300 px-1 tnum">{String(idx + 1).padStart(3, '0')}</td>
                   <td className="border border-gray-300 px-2 text-left leading-tight break-words">{r.ownerName}</td>
                   <td className="border border-gray-300 px-1 font-medium">{r.code}</td>
@@ -328,7 +332,7 @@ export default function StatementView() {
 
       {/* Individual notices */}
       <div className="no-print mt-6">
-        <h2 className="mb-2 text-sm font-semibold text-gray-700">Ατομικά ειδοποιητήρια</h2>
+        <h2 className="mb-2 text-sm font-semibold text-gray-700">Ειδοποιητήρια Διαμερίσματος</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {st.rows.map((r) => (
             <Link

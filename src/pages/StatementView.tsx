@@ -117,12 +117,16 @@ export default function StatementView() {
           <Button variant="secondary" onClick={() => window.print()}>
             <Printer size={18} /> Εκτύπωση
           </Button>
-          <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/notices`)}>
-            <Printer size={18} /> Όλα τα ειδοποιητήρια
-          </Button>
-          <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/receipts`)}>
-            <Printer size={18} /> Όλες οι αποδείξεις
-          </Button>
+          {isManager && (
+            <>
+              <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/notices`)}>
+                <Printer size={18} /> Όλα τα ειδοποιητήρια
+              </Button>
+              <Button variant="secondary" onClick={() => navigate(`/statements/${st.id}/receipts`)}>
+                <Printer size={18} /> Όλες οι αποδείξεις
+              </Button>
+            </>
+          )}
           {isManager && st.status !== 'issued' && st.kind !== 'special' && (
             <Button variant="secondary" onClick={refreshDraft} disabled={busy}>
               <RefreshCw size={18} /> {busy ? 'Ανανέωση…' : 'Ανανέωση'}
@@ -333,7 +337,9 @@ export default function StatementView() {
         <Footer className="print-only mt-2 border-t border-gray-100" />
       </div>
 
-      {/* Individual notices */}
+      {/* Individual notices — μόνο για διαχειριστές */}
+      {isManager && (
+      <>
       <div className="no-print mt-6">
         <h2 className="mb-2 text-sm font-semibold text-gray-700">Ειδοποιητήρια Διαμερίσματος</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -366,6 +372,8 @@ export default function StatementView() {
           ))}
         </div>
       </div>
+      </>
+      )}
 
       <ConfirmDialog
         open={showDelete}

@@ -138,6 +138,9 @@ export default function Finances() {
             <Receipt size={18} /> Δαπάνες ανά περίοδο
           </span>
           <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-400">
+              Επιλέξτε περίοδο για προβολή δαπανών. Προεπιλογή τρέχων μήνας.
+            </span>
             <select
               value={expView}
               onChange={(e) => setExpView(e.target.value as ExpView)}

@@ -9,7 +9,7 @@ import { money, currentPeriod, formatDate, formatPeriod } from '@/lib/format'
 import type { AllocationMethod, Expense, ExpenseGroup } from '@/types'
 import { ALLOCATION_LABELS, GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
 import { listExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/repos/expenses'
-import { uploadReceipt } from '@/lib/upload'
+import { uploadReceipt, deleteFile } from '@/lib/upload'
 import { analyzeReceipt } from '@/lib/ocr'
 import { UploadProgress } from '@/components/UploadProgress'
 import { logAudit } from '@/lib/audit'
@@ -223,6 +223,27 @@ export default function Expenses() {
     setModalOpen(false)
     await load()
     await refresh()
+  }
+
+  /** Διαγραφή του εγγράφου/παραστατικού μιας δαπάνης (και re-upload με «Επιλογή αρχείου»). */
+  async function removeReceipt() {
+    if (form.receiptPath) {
+      try {
+        await deleteFile(form.receiptPath)
+      } catch {
+        // αγνόησε — το doc θα καθαριστεί ούτως ή άλλως
+      }
+    }
+    if (editing) {
+      await updateExpense(editing.id, {
+        receiptUrl: null,
+        receiptName: null,
+        receiptPath: null,
+      } as unknown as Partial<Expense>)
+      setEditing({ ...editing, receiptUrl: undefined, receiptName: undefined, receiptPath: undefined })
+      await load()
+    }
+    setForm((f) => ({ ...f, receiptUrl: undefined, receiptName: undefined, receiptPath: undefined }))
   }
 
   async function confirmDelete() {
@@ -593,14 +614,28 @@ export default function Expenses() {
               {aiMsg && <p className="mt-1 text-xs text-gray-500">{aiMsg}</p>}
               <UploadProgress value={uploadPct} />
               {form.receiptUrl && !file && (
-                <a
-                  href={form.receiptUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-                >
-                  <Paperclip size={14} /> {form.receiptName ?? 'Τρέχον παραστατικό'}
-                </a>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <a
+                    href={form.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                  >
+                    <Paperclip size={14} /> {form.receiptName ?? 'Τρέχον παραστατικό'}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={removeReceipt}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-1 rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+                    title="Διαγραφή εγγράφου"
+                  >
+                    <Trash2 size={14} /> Διαγραφή
+                  </button>
+                  <span className="text-xs text-gray-400">
+                    (μπορείς να ανεβάσεις νέο από «Επιλογή αρχείου»)
+                  </span>
+                </div>
               )}
             </Field>
           </div>

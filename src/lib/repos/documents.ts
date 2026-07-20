@@ -51,6 +51,11 @@ export async function renameDocEntry(id: string, name: string): Promise<void> {
   await updateDoc(doc(requireDb(), 'documents', id), { name })
 }
 
+/** Μετακινεί έγγραφο/φάκελο σε άλλο φάκελο (ρίζα = null). */
+export async function moveDocEntry(id: string, parentId: string | null): Promise<void> {
+  await updateDoc(doc(requireDb(), 'documents', id), { parentId })
+}
+
 /**
  * Delete an entry. For files, also removes the stored blob. For folders, the
  * whole subtree (child folders + files) is removed recursively.

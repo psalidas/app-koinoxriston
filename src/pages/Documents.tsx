@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   Download,
+  FolderInput,
 } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
@@ -23,6 +24,7 @@ import {
   createFolder,
   createFileEntry,
   renameDocEntry,
+  moveDocEntry,
   deleteDocEntry,
 } from '@/lib/repos/documents'
 import { uploadDocument } from '@/lib/upload'
@@ -46,6 +48,7 @@ export default function Documents() {
   const [folderName, setFolderName] = useState('')
   const [renaming, setRenaming] = useState<DocEntry | null>(null)
   const [renameName, setRenameName] = useState('')
+  const [moving, setMoving] = useState<DocEntry | null>(null)
   const [toDelete, setToDelete] = useState<DocEntry | null>(null)
   const [upload, setUpload] = useState<{ current: number; total: number; name: string; pct: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -166,6 +169,45 @@ export default function Documents() {
     try {
       await renameDocEntry(renaming.id, renameName.trim())
       setRenaming(null)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Διαθέσιμοι φάκελοι προορισμού για μετακίνηση (εξαιρείται ο ίδιος + απόγονοι
+  // αν μετακινείται φάκελος, και ο τρέχων γονέας).
+  const moveTargets = useMemo(() => {
+    if (!moving) return [] as { id: string; label: string }[]
+    const excluded = new Set<string>()
+    if (moving.kind === 'folder') {
+      const collect = (fid: string) => {
+        excluded.add(fid)
+        entries.filter((e) => e.parentId === fid && e.kind === 'folder').forEach((c) => collect(c.id))
+      }
+      collect(moving.id)
+    }
+    const pathOf = (f: DocEntry) => {
+      const parts: string[] = []
+      let cur: DocEntry | undefined = f
+      while (cur) {
+        parts.unshift(cur.name)
+        cur = cur.parentId ? byId.get(cur.parentId) : undefined
+      }
+      return parts.join(' / ')
+    }
+    return entries
+      .filter((e) => e.kind === 'folder' && !excluded.has(e.id) && e.id !== (moving.parentId ?? null))
+      .map((f) => ({ id: f.id, label: pathOf(f) }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'el'))
+  }, [moving, entries, byId])
+
+  async function doMove(targetId: string | null) {
+    if (!moving) return
+    setBusy(true)
+    try {
+      await moveDocEntry(moving.id, targetId)
+      setMoving(null)
       await load()
     } finally {
       setBusy(false)
@@ -326,6 +368,13 @@ export default function Documents() {
                   {isManager && (
                     <>
                       <button
+                        onClick={() => setMoving(e)}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+                        title="Μετακίνηση σε φάκελο"
+                      >
+                        <FolderInput size={16} />
+                      </button>
+                      <button
                         onClick={() => {
                           setRenaming(e)
                           setRenameName(e.name)
@@ -402,6 +451,45 @@ export default function Documents() {
             onKeyDown={(e) => e.key === 'Enter' && saveRename()}
           />
         </Field>
+      </Modal>
+
+      {/* Move to folder */}
+      <Modal
+        open={!!moving}
+        onClose={() => setMoving(null)}
+        title={`Μετακίνηση «${moving?.name ?? ''}»`}
+        footer={
+          <Button variant="secondary" onClick={() => setMoving(null)}>
+            Κλείσιμο
+          </Button>
+        }
+      >
+        <p className="mb-2 text-xs text-gray-500">Επιλέξτε φάκελο προορισμού:</p>
+        <div className="max-h-72 space-y-1 overflow-y-auto">
+          {(moving?.parentId ?? null) !== null && (
+            <button
+              onClick={() => doMove(null)}
+              disabled={busy}
+              className="flex w-full items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Home size={16} className="text-gray-400" /> Έγγραφα (ρίζα)
+            </button>
+          )}
+          {moveTargets.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => doMove(t.id)}
+              disabled={busy}
+              className="flex w-full items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Folder size={16} className="shrink-0 text-amber-500" />
+              <span className="truncate">{t.label}</span>
+            </button>
+          ))}
+          {moveTargets.length === 0 && (moving?.parentId ?? null) === null && (
+            <p className="py-4 text-center text-sm text-gray-400">Δεν υπάρχει άλλος φάκελος.</p>
+          )}
+        </div>
       </Modal>
 
       <ConfirmDialog

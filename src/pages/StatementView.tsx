@@ -349,8 +349,11 @@ export default function StatementView() {
               to={`/statements/${st.id}/notice/${r.apartmentId}`}
               className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-blue-300"
             >
-              <span className="font-medium text-gray-900">{r.code}</span>
-              <span className="tnum text-gray-500">{amount(r.total)}</span>
+              <span className="min-w-0 flex-1 truncate pr-2">
+                <span className="font-medium text-gray-900">{r.code}</span>
+                {r.ownerName && <span className="ml-1.5 text-xs text-gray-500">{r.ownerName}</span>}
+              </span>
+              <span className="tnum shrink-0 text-gray-500">{amount(r.total)}</span>
             </Link>
           ))}
         </div>
@@ -366,8 +369,11 @@ export default function StatementView() {
               to={`/statements/${st.id}/receipt/${r.apartmentId}`}
               className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-blue-300"
             >
-              <span className="font-medium text-gray-900">{r.code}</span>
-              <span className="tnum text-gray-500">{amount(r.total)}</span>
+              <span className="min-w-0 flex-1 truncate pr-2">
+                <span className="font-medium text-gray-900">{r.code}</span>
+                {r.ownerName && <span className="ml-1.5 text-xs text-gray-500">{r.ownerName}</span>}
+              </span>
+              <span className="tnum shrink-0 text-gray-500">{amount(r.total)}</span>
             </Link>
           ))}
         </div>

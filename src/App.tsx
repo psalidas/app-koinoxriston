@@ -14,6 +14,7 @@ import NoticeView from './pages/NoticeView'
 import AllNotices from './pages/AllNotices'
 import Receipts from './pages/Receipts'
 import Finances from './pages/Finances'
+import BuildingRedirect from './pages/BuildingRedirect'
 import Payments from './pages/Payments'
 import ApartmentLedger from './pages/ApartmentLedger'
 import Fund from './pages/Fund'
@@ -52,6 +53,7 @@ export default function App() {
         }
       >
         {/* Shared (managers + residents) */}
+        <Route path="/b/:slug" element={<BuildingRedirect />} />
         <Route path="/portal" element={<Portal />} />
         <Route path="/my-profile" element={<MyProfile />} />
         <Route path="/announcements" element={<Announcements />} />

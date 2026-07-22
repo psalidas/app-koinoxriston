@@ -19,8 +19,21 @@ export interface UserDoc {
   buildingIds: string[]
   apartmentIds: string[]
   active: boolean
+  /** Υπερδιαχειριστής πλατφόρμας — βλέπει/διαχειρίζεται όλα τα κτίρια. */
+  superadmin?: boolean
   invitedAt?: Timestamp // πότε στάλθηκε πρόσκληση εισόδου
   inviteChannel?: 'email' | 'sms'
+  createdAt?: Timestamp
+}
+
+/** Μέλος ενός κτιρίου (ρόλος & διαμερίσματα ανά κτίριο).
+ *  Firestore: /buildings/{buildingId}/members/{userId} (id = αναγνωριστικό χρήστη). */
+export interface Member {
+  id: string // = αναγνωριστικό χρήστη (email/κινητό)
+  name: string
+  role: Role
+  apartmentIds: string[]
+  active: boolean
   createdAt?: Timestamp
 }
 
@@ -46,10 +59,16 @@ export interface MillesimeScale {
 export interface Building {
   id: string
   code: string // e.g. '000102'
+  /** Μοναδικό slug για URL, π.χ. 'karamanli17' → /b/karamanli17 */
+  slug?: string
   name: string
   address: string
   area: string // περιοχή
   managerName: string
+  /** Αναγνωριστικά διαχειριστών που διαχειρίζονται το κτίριο. */
+  managerIds?: string[]
+  /** Ενεργό κτίριο (false = αρχειοθετημένο). */
+  active?: boolean
   iban?: string
   afm?: string
   /** Editable millesime tables. Each apartment carries a value per scale. */

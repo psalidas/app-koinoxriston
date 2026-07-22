@@ -1,10 +1,25 @@
-import { arrayUnion, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayUnion, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { col, clean, requireDb } from '../db'
 import { compareEl } from '../format'
 import type { Role, UserDoc } from '@/types'
 
 export async function listUsers(): Promise<UserDoc[]> {
   const snap = await getDocs(col('users'))
+  const rows = snap.docs.map((d) => ({ email: d.id, ...(d.data() as Omit<UserDoc, 'email'>) }))
+  return rows.sort((a, b) => compareEl(a.name || a.email, b.name || b.email))
+}
+
+/**
+ * Χρήστες που ανήκουν σε ένα από τα δοσμένα κτίρια (για διαχειριστές — βλέπουν
+ * μόνο τους χρήστες των δικών τους κτιρίων). Ο superadmin χρησιμοποιεί listUsers.
+ * Το query φιλτράρει με array-contains-any ώστε οι κανόνες να το επιτρέπουν.
+ */
+export async function listUsersByBuildings(buildingIds: string[]): Promise<UserDoc[]> {
+  if (buildingIds.length === 0) return []
+  // array-contains-any: έως 30 τιμές — αρκετά για τα κτίρια ενός διαχειριστή.
+  const snap = await getDocs(
+    query(col('users'), where('buildingIds', 'array-contains-any', buildingIds.slice(0, 30))),
+  )
   const rows = snap.docs.map((d) => ({ email: d.id, ...(d.data() as Omit<UserDoc, 'email'>) }))
   return rows.sort((a, b) => compareEl(a.name || a.email, b.name || b.email))
 }

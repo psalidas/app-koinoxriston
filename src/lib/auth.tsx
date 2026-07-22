@@ -34,6 +34,8 @@ interface AuthState {
   hasAccess: boolean
   role: Role | null
   isManager: boolean
+  /** Υπερδιαχειριστής πλατφόρμας (bootstrap admin ή profile.superadmin). */
+  superadmin: boolean
   /** Το αναγνωριστικό που χρησιμοποιήθηκε για το lookup (email/κινητό). */
   authIdentifier: string | null
   /** Αποτέλεσμα ανάγνωσης του /users doc (διάγνωση). */
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasAccess: false,
     role: null,
     isManager: false,
+    superadmin: false,
     authIdentifier: null,
     authReason: 'ok',
   })
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             hasAccess: false,
             role: null,
             isManager: false,
+            superadmin: false,
             authIdentifier: null,
             authReason: 'ok',
           })
@@ -159,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const hasAccess = isBootstrap || (!!profile && profile.active !== false)
         const isManager =
           isBootstrap || role === 'admin' || role === 'manager'
+        const superadmin = isBootstrap || profile?.superadmin === true
         setState({
           loading: false,
           user,
@@ -166,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           hasAccess,
           role,
           isManager,
+          superadmin,
           authIdentifier: identifier ?? null,
           authReason: reason,
         })

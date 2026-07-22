@@ -1,7 +1,7 @@
-import { deleteDoc, doc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayUnion, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { col, clean, requireDb } from '../db'
 import { compareEl } from '../format'
-import type { UserDoc } from '@/types'
+import type { Role, UserDoc } from '@/types'
 
 export async function listUsers(): Promise<UserDoc[]> {
   const snap = await getDocs(col('users'))
@@ -19,4 +19,34 @@ export async function updateUser(email: string, patch: Partial<UserDoc>): Promis
 
 export async function deleteUser(email: string): Promise<void> {
   await deleteDoc(doc(requireDb(), 'users', email))
+}
+
+/**
+ * Συνδέει χρήστη με κτίριο (χωρίς να χαλάει άλλα κτίρια — arrayUnion). Αν δεν
+ * υπάρχει /users doc, δημιουργείται (θα σταλεί αυτόματα πρόσκληση). Θέτει ρόλο
+ * μόνο αν δεν υπάρχει ήδη ισχυρότερος.
+ */
+export async function addUserToBuilding(
+  identifier: string,
+  buildingId: string,
+  opts: { name?: string; role?: Role } = {},
+): Promise<void> {
+  const ref = doc(requireDb(), 'users', identifier)
+  const snap = await getDoc(ref)
+  if (snap.exists()) {
+    await setDoc(
+      ref,
+      clean({ buildingIds: arrayUnion(buildingId) as unknown as string[], role: opts.role }),
+      { merge: true },
+    )
+  } else {
+    await setDoc(ref, {
+      name: opts.name ?? '',
+      role: opts.role ?? 'manager',
+      buildingIds: [buildingId],
+      apartmentIds: [],
+      active: true,
+      createdAt: serverTimestamp(),
+    })
+  }
 }

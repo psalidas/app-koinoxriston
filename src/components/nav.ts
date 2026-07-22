@@ -51,6 +51,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/directory', label: 'Κατάλογος', icon: Contact },
   { to: '/contacts', label: 'Τηλέφωνα', icon: Phone },
+  { to: '/admin/buildings', label: 'Κτίρια', icon: Building2, section: 'Διαχείριση' },
   { to: '/import', label: 'Εισαγωγή/Εξαγωγή', icon: Upload, section: 'Διαχείριση' },
   { to: '/admin/users', label: 'Χρήστες', icon: Users, section: 'Διαχείριση' },
   { to: '/admin/invites', label: 'Προσκλήσεις', icon: Send, section: 'Διαχείριση' },

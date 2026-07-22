@@ -15,6 +15,7 @@ import AllNotices from './pages/AllNotices'
 import Receipts from './pages/Receipts'
 import Finances from './pages/Finances'
 import BuildingRedirect from './pages/BuildingRedirect'
+import Buildings from './pages/admin/Buildings'
 import Payments from './pages/Payments'
 import ApartmentLedger from './pages/ApartmentLedger'
 import Fund from './pages/Fund'
@@ -88,6 +89,7 @@ export default function App() {
           <Route path="/fund" element={<Fund />} />
           <Route path="/contracts" element={<Contracts />} />
           <Route path="/import" element={<ImportExport />} />
+          <Route path="/admin/buildings" element={<Buildings />} />
           <Route path="/admin/users" element={<Users />} />
           <Route path="/admin/invites" element={<InviteSettings />} />
           <Route path="/admin/broadcast" element={<Broadcast />} />

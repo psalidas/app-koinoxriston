@@ -15,6 +15,7 @@ import {
 import { saveMember } from '@/lib/repos/members'
 import { addUserToBuilding } from '@/lib/repos/users'
 import { seedDemoBuilding } from '@/lib/seedDemo'
+import { backfillMembers } from '@/lib/backfill'
 import { DEFAULT_SCALES } from '@/data/seed'
 import { normalizeIdentifier } from '@/lib/format'
 import { logAudit } from '@/lib/audit'
@@ -38,6 +39,23 @@ export default function Buildings() {
   const [form, setForm] = useState(blank())
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
+
+  async function runBackfill() {
+    if (!confirm('Μετάβαση δεδομένων: θα δημιουργηθούν εγγραφές μελών & slug για τα υπάρχοντα κτίρια (χωρίς απώλεια). Συνέχεια;')) return
+    setBackfilling(true)
+    setBackfillMsg(null)
+    try {
+      const r = await backfillMembers()
+      setBackfillMsg(`Ολοκληρώθηκε: ${r.members} μέλη, ${r.buildingsUpdated}/${r.buildings} κτίρια ενημερώθηκαν.`)
+      await load()
+    } catch (e) {
+      setBackfillMsg('Σφάλμα: ' + ((e as Error).message || 'άγνωστο'))
+    } finally {
+      setBackfilling(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -123,11 +141,22 @@ export default function Buildings() {
         title="Κτίρια"
         subtitle={superadmin ? 'Όλα τα κτίρια της πλατφόρμας' : 'Τα κτίρια που διαχειρίζεστε'}
         actions={
-          <Button onClick={() => { setForm(blank()); setMsg(null); setOpen(true) }}>
-            <Plus size={18} /> Νέο κτίριο
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {superadmin && (
+              <Button variant="secondary" onClick={runBackfill} disabled={backfilling}>
+                {backfilling ? 'Μετάβαση…' : 'Μετάβαση δεδομένων'}
+              </Button>
+            )}
+            <Button onClick={() => { setForm(blank()); setMsg(null); setOpen(true) }}>
+              <Plus size={18} /> Νέο κτίριο
+            </Button>
+          </div>
         }
       />
+
+      {backfillMsg && (
+        <div className="mb-3 rounded-md bg-blue-50 p-2 text-sm text-blue-700">{backfillMsg}</div>
+      )}
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">

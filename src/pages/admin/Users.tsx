@@ -7,7 +7,7 @@ import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type { Role, UserDoc } from '@/types'
 import { ROLE_LABELS } from '@/types'
-import { listUsers, saveUser, deleteUser } from '@/lib/repos/users'
+import { listUsers, listUsersByBuildings, saveUser, deleteUser } from '@/lib/repos/users'
 import { resendInvite } from '@/lib/invites'
 import { normalizeIdentifier } from '@/lib/format'
 import { logAudit } from '@/lib/audit'
@@ -22,8 +22,8 @@ const emptyForm = () => ({
 })
 
 export default function Users() {
-  const { building, apartments } = useAppData()
-  const { user, profile } = useAuth()
+  const { building, buildings, apartments } = useAppData()
+  const { user, profile, superadmin } = useAuth()
   const [users, setUsers] = useState<UserDoc[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<UserDoc | null>(null)
@@ -32,7 +32,12 @@ export default function Users() {
   const [resending, setResending] = useState<string | null>(null)
 
   async function load() {
-    setUsers(await listUsers())
+    // Ο superadmin βλέπει όλους· ο διαχειριστής μόνο τους χρήστες των κτιρίων του.
+    if (superadmin) {
+      setUsers(await listUsers())
+    } else {
+      setUsers(await listUsersByBuildings(buildings.map((b) => b.id)))
+    }
   }
 
   async function doResend(u: UserDoc) {
@@ -50,7 +55,8 @@ export default function Users() {
 
   useEffect(() => {
     void load()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [superadmin, buildings])
 
   function openNew() {
     setEditing(null)
@@ -83,12 +89,16 @@ export default function Users() {
   async function save() {
     const email = normalizeIdentifier(form.email)
     if (!email) return
+    // Διατήρησε τυχόν άλλα κτίρια του χρήστη· απλώς εξασφάλισε το ενεργό κτίριο.
+    const buildingIds = Array.from(
+      new Set([...(editing?.buildingIds ?? []), ...(building ? [building.id] : [])]),
+    )
     await saveUser(email, {
       name: form.name.trim(),
       role: form.role,
       phone: form.phone.trim() || undefined,
       active: form.active,
-      buildingIds: building ? [building.id] : [],
+      buildingIds,
       apartmentIds: form.apartmentIds,
     })
     await logAudit({

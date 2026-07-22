@@ -106,9 +106,14 @@ service cloud.firestore {
     // Default deny.
     match /{document=**} { allow read, write: if false; }
 
-    // /users — global manager διαχειρίζεται· ο χρήστης διαβάζει το δικό του.
+    // /users — ο χρήστης διαβάζει το δικό του doc· ο superadmin όλους· ο
+    // διαχειριστής μόνο χρήστες που μοιράζονται κτίριο μαζί του (η λίστα κάνει
+    // query με array-contains-any στα κτίρια του διαχειριστή).
     match /users/{userId} {
-      allow read: if isManager() || (isAuthed() && uid() == userId);
+      allow read: if isSuperadmin()
+        || (isAuthed() && uid() == userId)
+        || (isManager()
+            && resource.data.get('buildingIds', []).hasAny(userDoc().get('buildingIds', [])));
       allow create, update, delete: if isManager();
     }
 

@@ -48,7 +48,10 @@ export default function Buildings() {
     setBackfillMsg(null)
     try {
       const r = await backfillMembers()
-      setBackfillMsg(`Ολοκληρώθηκε: ${r.members} μέλη, ${r.buildingsUpdated}/${r.buildings} κτίρια ενημερώθηκαν.`)
+      let m = `Ολοκληρώθηκε: ${r.members} μέλη, ${r.buildingsUpdated}/${r.buildings} κτίρια ενημερώθηκαν.`
+      if (r.legacyAssigned) m += ` ${r.legacyAssigned} legacy χρήστες ανατέθηκαν στο «${r.primaryBuilding}».`
+      if (r.legacyUnassigned) m += ` ⚠️ ${r.legacyUnassigned} χρήστες χωρίς κτίριο ΔΕΝ ανατέθηκαν — ελέγξτε πριν την απομόνωση.`
+      setBackfillMsg(m)
       await load()
     } catch (e) {
       setBackfillMsg('Σφάλμα: ' + ((e as Error).message || 'άγνωστο'))

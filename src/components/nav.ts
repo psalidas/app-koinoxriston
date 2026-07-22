@@ -23,6 +23,7 @@ import {
   MailPlus,
   Settings,
   IdCard,
+  LifeBuoy,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -58,6 +59,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/admin/broadcast', label: 'Μαζική αποστολή', icon: MailPlus, section: 'Διαχείριση' },
   { to: '/admin/audit', label: 'Ιστορικό', icon: History, section: 'Διαχείριση' },
   { to: '/admin/settings', label: 'Ρυθμίσεις κτιρίου', icon: Settings, section: 'Διαχείριση' },
+  { to: '/support', label: 'Υποστήριξη', icon: LifeBuoy, section: 'Διαχείριση' },
 ]
 
 const RESIDENT_NAV: NavItem[] = [
@@ -73,6 +75,7 @@ const RESIDENT_NAV: NavItem[] = [
   { to: '/documents', label: 'Έγγραφα', icon: FolderOpen },
   { to: '/directory', label: 'Κατάλογος', icon: Contact },
   { to: '/contacts', label: 'Τηλέφωνα', icon: Phone },
+  { to: '/support', label: 'Υποστήριξη', icon: LifeBuoy },
 ]
 
 export function navFor(isManager: boolean): NavItem[] {

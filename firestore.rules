@@ -1,16 +1,21 @@
 rules_version = '2';
 
-// Διαχείριση Πολυκατοικίας — membership-based access.
+// Διαχείριση Πολυκατοικίας — multi-building, membership-based access.
 //
-// Unlike the domain-locked Crowdpolicy internal apps, residents/owners are
-// external users, so access is granted per-user via a /users/{email} document
-// created by a manager. A bootstrap admin is hardcoded so the very first
-// deploy can create the first /users docs.
+// Residents/owners are external users; πρόσβαση δίνεται ανά χρήστη μέσω
+// /users/{email} doc (ρόλος + buildingIds) και ανά κτίριο μέσω
+// /buildings/{bid}/members/{userId}. Ένας bootstrap admin είναι hardcoded ώστε
+// το πρώτο deploy να μπορεί να στήσει τα πρώτα docs.
+//
+// Απομόνωση δεδομένων (Phase 4):
+//   - Τα δεδομένα κάθε συλλογής φέρουν `buildingId`. Διαβάζει/γράφει μόνο όποιος
+//     ανήκει/διαχειρίζεται το συγκεκριμένο κτίριο· ο superadmin τα βλέπει όλα.
+//   - Οι λίστες φιλτράρουν πάντα με `where('buildingId','==',X)`, οπότε ο κανόνας
+//     canRead/canManage αποτιμάται με σταθερό bid ⇒ το query επιτρέπεται.
+//   - Δίχτυ ασφαλείας: επιτρέπεται και μέσω users.buildingIds (πιο επιτρεπτικό,
+//     ποτέ δεν κλειδώνει — δεν διαρρέει, τα buildingIds είναι ανά χρήστη).
 //
 // Roles: 'admin' | 'manager' | 'owner' | 'resident'
-//   - admin/manager  → full read/write on domain data
-//   - owner/resident → read data for their building(s); write only their own
-//                      participation (votes, tickets, topic comments) [Phase 2/3]
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -19,12 +24,9 @@ service cloud.firestore {
     }
 
     // Membership identifier. Οι magic-link συνεδρίες φέρουν custom claim
-    // `identifier` (= το id του /users doc) ώστε να ταυτοποιούνται αξιόπιστα
-    // email & κινητό. Αλλιώς email, αλλιώς αριθμός τηλεφώνου.
-    //
-    // ΣΗΜΑΝΤΙΚΟ: ελέγχουμε την ύπαρξη του claim με `in` ΠΡΙΝ την προσπελάσουμε.
-    // Η απευθείας προσπέλαση ανύπαρκτου custom claim (π.χ. `identifier` σε
-    // σύνδεση Google) κάνει την αποτίμηση του κανόνα να αποτύχει → άρνηση.
+    // `identifier`· αλλιώς email, αλλιώς αριθμός τηλεφώνου. Ελέγχουμε την ύπαρξη
+    // του claim με `in` ΠΡΙΝ την προσπελάσουμε (η προσπέλαση ανύπαρκτου claim σε
+    // σύνδεση Google κάνει την αποτίμηση να αποτύχει → άρνηση).
     function uid() {
       return ('identifier' in request.auth.token && request.auth.token.identifier != null)
         ? request.auth.token.identifier
@@ -39,123 +41,171 @@ service cloud.firestore {
       return isAuthed() && request.auth.token.email == 'michael@crowdpolicy.com';
     }
 
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(uid()));
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
     function isKnownUser() {
-      return isAuthed() && (
-        isBootstrapAdmin()
-        || exists(/databases/$(database)/documents/users/$(uid()))
-      );
+      return isAuthed() && (isBootstrapAdmin() || userExists());
     }
 
+    // «Global» διαχειριστής (ρόλος admin/manager στο /users) — για ενέργειες εκτός
+    // κτιρίου (π.χ. δημιουργία νέου κτιρίου, διαχείριση χρηστών).
     function isManager() {
       return isAuthed() && (
         isBootstrapAdmin()
-        || (
-          exists(/databases/$(database)/documents/users/$(uid()))
-          && userDoc().role in ['admin', 'manager']
-        )
+        || (userExists() && userDoc().role in ['admin', 'manager'])
+      );
+    }
+
+    function isSuperadmin() {
+      return isAuthed() && (
+        isBootstrapAdmin()
+        || (userExists() && userDoc().get('superadmin', false) == true)
+      );
+    }
+
+    // Μέλος συγκεκριμένου κτιρίου.
+    function memberExists(bid) {
+      return exists(/databases/$(database)/documents/buildings/$(bid)/members/$(uid()));
+    }
+    function memberRole(bid) {
+      return get(/databases/$(database)/documents/buildings/$(bid)/members/$(uid())).data.get('role', '');
+    }
+
+    // Δίχτυ ασφαλείας: το κτίριο περιλαμβάνεται στα buildingIds του χρήστη.
+    function inMyBuildingIds(bid) {
+      return userExists()
+        && 'buildingIds' in userDoc()
+        && bid in userDoc().buildingIds;
+    }
+
+    // Ανάγνωση δεδομένων κτιρίου: superadmin, ή μέλος, ή (δίχτυ) buildingIds.
+    function canRead(bid) {
+      return isAuthed() && (
+        isSuperadmin()
+        || memberExists(bid)
+        || inMyBuildingIds(bid)
+      );
+    }
+
+    // Διαχείριση δεδομένων κτιρίου: superadmin, ή μέλος-διαχειριστής, ή (δίχτυ)
+    // global manager με το κτίριο στα buildingIds του.
+    function canManage(bid) {
+      return isAuthed() && (
+        isSuperadmin()
+        || (memberExists(bid) && memberRole(bid) in ['admin', 'manager'])
+        || (inMyBuildingIds(bid) && isManager())
       );
     }
 
     // Default deny.
     match /{document=**} { allow read, write: if false; }
 
-    // /users — managers manage; a user can read their own doc.
+    // /users — global manager διαχειρίζεται· ο χρήστης διαβάζει το δικό του.
     match /users/{userId} {
       allow read: if isManager() || (isAuthed() && uid() == userId);
       allow create, update, delete: if isManager();
     }
 
-    // Building configuration & directory — known users read, managers write.
+    // Κατάλογος κτιρίων — όλοι οι γνωστοί χρήστες διαβάζουν (η εφαρμογή τα φιλτράρει
+    // ανά χρήστη client-side)· δημιουργία από global manager· επεξεργασία μόνο από
+    // διαχειριστή του συγκεκριμένου κτιρίου.
     match /buildings/{id} {
       allow read: if isKnownUser();
-      allow write: if isManager();
+      allow create: if isManager();
+      allow update, delete: if isSuperadmin() || canManage(id);
     }
-    // Μέλη κτιρίου (ρόλος & διαμερίσματα ανά κτίριο) — known users read, managers write.
+    // Μέλη κτιρίου — γνωστοί χρήστες διαβάζουν· global manager γράφει (χρειάζεται
+    // κατά τη δημιουργία κτιρίου, πριν υπάρξει member doc του δημιουργού).
     match /buildings/{bid}/members/{userId} {
       allow read: if isKnownUser();
-      allow write: if isManager();
+      allow write: if isManager() || canManage(bid);
     }
+
+    // ── Δεδομένα κτιρίου (buildingId-scoped) ──────────────────────────────────
     match /apartments/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
     match /people/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Financials — known users read, managers write.
     match /expenses/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-    // Αύξοντες μετρητές (π.χ. κωδικοί δαπανών) — managers.
+    // Αύξοντες μετρητές ανά κτίριο (doc id == buildingId).
     match /counters/{id} {
-      allow read, write: if isManager();
+      allow read, write: if canManage(id);
     }
     match /payments/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
     match /statements/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
     match /fundEntries/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Documents / announcements — known users read, managers write.
     match /documents/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
     match /announcements/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Tickets (βλάβες) — known users read & create; managers update/delete.
-    match /tickets/{id} {
-      allow read: if isKnownUser();
-      allow create: if isKnownUser();
-      allow update, delete: if isManager();
-    }
-
-    // Contracts (συμβόλαια) — known users read, managers write.
     match /contracts/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Works (εργασίες) — known users read, managers write.
     match /works/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Τηλέφωνα / χρήσιμες επαφές — known users read, managers write.
     match /contacts/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
+    }
+    match /assemblies/{id} {
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
 
-    // Mail queue for the firestore-send-email extension — written only from
-    // trusted Cloud Functions (admin SDK bypasses rules). Deny all clients.
-    match /mail/{id} {
-      allow read, write: if false;
+    // Βλάβες — μέλη κτιρίου διαβάζουν & δημιουργούν· διαχειριστές του κτιρίου
+    // ενημερώνουν/διαγράφουν.
+    match /tickets/{id} {
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canRead(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
 
-    // Discussion — known users read & participate; managers moderate.
+    // Συζήτηση — θέματα ανά κτίριο· σχόλια/προσφορές ανά θέμα (γνωστοί χρήστες).
     match /topics/{id} {
-      allow read: if isKnownUser();
-      allow create: if isKnownUser();
-      allow update, delete: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canRead(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
     match /comments/{id} {
       allow read: if isKnownUser();
@@ -170,13 +220,12 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Polls — managers manage; everyone known reads.
+    // Ψηφοφορίες ανά κτίριο· ψήφοι ανά ψηφοφορία (ο ψηφοφόρος γράφει τη δική του).
     match /polls/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canManage(request.resource.data.buildingId);
+      allow update, delete: if canManage(resource.data.buildingId);
     }
-
-    // Votes — a user writes only their own vote; managers (and the voter) read.
     match /votes/{id} {
       allow read: if isManager() || (isAuthed() && resource.data.voterId == uid());
       allow create, update: if isKnownUser()
@@ -184,43 +233,40 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Assemblies (ΓΣ) — known users read, managers write.
-    match /assemblies/{id} {
-      allow read: if isKnownUser();
-      allow write: if isManager();
+    // Mail queue (firestore-send-email) — μόνο από trusted Cloud Functions.
+    match /mail/{id} {
+      allow read, write: if false;
     }
 
-    // App settings (π.χ. settings/invites) — managers only. Τα API keys ΔΕΝ
-    // ζουν εδώ (μένουν στα functions env). Οι Cloud Functions διαβάζουν με
-    // Admin SDK (bypass rules).
+    // App settings (π.χ. settings/invites) — global manager. Τα API keys μένουν
+    // στα functions env.
     match /settings/{id} {
       allow read, write: if isManager();
     }
 
-    // Magic-link tokens — ΜΟΝΟ Admin SDK (functions). Καμία client πρόσβαση.
+    // Magic-link tokens — ΜΟΝΟ Admin SDK.
     match /magicTokens/{token} {
       allow read, write: if false;
     }
 
     // Ιδιωτικό προφίλ επικοινωνίας — ο χρήστης το επεξεργάζεται μόνος του·
-    // ορατό στον ίδιο και στους διαχειριστές (πλήρη στοιχεία).
+    // ορατό στον ίδιο και στους διαχειριστές.
     match /profiles/{id} {
       allow read: if isManager() || (isAuthed() && uid() == id);
       allow write: if isManager() || (isAuthed() && uid() == id);
     }
 
-    // Κατάλογος ιδιοκτητών/ενοίκων — περιέχει μόνο τα ορατά πεδία (φιλτράρονται
-    // κατά την εγγραφή). Όλοι οι γνωστοί χρήστες διαβάζουν· ο καθένας γράφει
-    // μόνο τη δική του εγγραφή.
+    // Κατάλογος ιδιοκτητών/ενοίκων — μόνο ορατά πεδία. Γνωστοί χρήστες διαβάζουν·
+    // ο καθένας γράφει μόνο τη δική του εγγραφή.
     match /directory/{id} {
       allow read: if isKnownUser();
       allow write: if isManager() || (isAuthed() && uid() == id);
     }
 
-    // Audit log — managers read· κάθε γνωστός χρήστης καταγράφει μόνο δικές του
-    // ενέργειες (π.χ. login), με userEmail == το δικό του αναγνωριστικό.
+    // Audit log — διαχειριστής του κτιρίου διαβάζει (query φιλτράρει buildingId)·
+    // κάθε γνωστός χρήστης καταγράφει μόνο δικές του ενέργειες.
     match /auditLogs/{id} {
-      allow read: if isManager();
+      allow read: if isSuperadmin() || canManage(resource.data.buildingId);
       allow create: if isKnownUser() && request.resource.data.userEmail == uid();
       allow update, delete: if false;
     }

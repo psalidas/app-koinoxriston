@@ -74,6 +74,11 @@ service cloud.firestore {
       allow read: if isKnownUser();
       allow write: if isManager();
     }
+    // Μέλη κτιρίου (ρόλος & διαμερίσματα ανά κτίριο) — known users read, managers write.
+    match /buildings/{bid}/members/{userId} {
+      allow read: if isKnownUser();
+      allow write: if isManager();
+    }
     match /apartments/{id} {
       allow read: if isKnownUser();
       allow write: if isManager();

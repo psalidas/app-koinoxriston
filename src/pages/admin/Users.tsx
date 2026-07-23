@@ -7,7 +7,7 @@ import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type { Role, UserDoc } from '@/types'
 import { ROLE_LABELS } from '@/types'
-import { listUsers, listUsersByBuildings, saveUser, deleteUser } from '@/lib/repos/users'
+import { listUsersByBuildings, saveUser, deleteUser } from '@/lib/repos/users'
 import { resendInvite } from '@/lib/invites'
 import { normalizeIdentifier } from '@/lib/format'
 import { logAudit } from '@/lib/audit'
@@ -22,8 +22,8 @@ const emptyForm = () => ({
 })
 
 export default function Users() {
-  const { building, buildings, apartments } = useAppData()
-  const { user, profile, superadmin } = useAuth()
+  const { building, apartments } = useAppData()
+  const { user, profile } = useAuth()
   const [users, setUsers] = useState<UserDoc[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<UserDoc | null>(null)
@@ -32,12 +32,8 @@ export default function Users() {
   const [resending, setResending] = useState<string | null>(null)
 
   async function load() {
-    // Ο superadmin βλέπει όλους· ο διαχειριστής μόνο τους χρήστες των κτιρίων του.
-    if (superadmin) {
-      setUsers(await listUsers())
-    } else {
-      setUsers(await listUsersByBuildings(buildings.map((b) => b.id)))
-    }
+    // Μόνο οι χρήστες του επιλεγμένου κτιρίου.
+    setUsers(building ? await listUsersByBuildings([building.id]) : [])
   }
 
   async function doResend(u: UserDoc) {
@@ -56,7 +52,7 @@ export default function Users() {
   useEffect(() => {
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [superadmin, buildings])
+  }, [building])
 
   function openNew() {
     setEditing(null)

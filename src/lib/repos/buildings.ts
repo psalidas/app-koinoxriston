@@ -1,4 +1,4 @@
-import { addDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { addDoc, arrayRemove, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { col, clean, requireDb } from '../db'
 import type { Building } from '@/types'
 
@@ -63,4 +63,85 @@ export async function updateBuilding(
   patch: Partial<Building>,
 ): Promise<void> {
   await updateDoc(doc(requireDb(), 'buildings', id), clean(patch))
+}
+
+export interface DeleteBuildingResult {
+  deletedDocs: number
+}
+
+// Συλλογές (flat) με πεδίο buildingId που ανήκουν στο κτίριο.
+const BUILDING_COLLECTIONS = [
+  'apartments', 'people', 'expenses', 'payments', 'statements', 'fundEntries',
+  'documents', 'announcements', 'contracts', 'works', 'contacts', 'assemblies',
+  'polls', 'tickets', 'topics', 'auditLogs',
+]
+
+// Διαγράφει σε δέσμες των 400 (όριο batch 500).
+async function deleteRefs(refs: { path: string }[]): Promise<number> {
+  const db = requireDb()
+  let n = 0
+  for (let i = 0; i < refs.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const r of refs.slice(i, i + 400)) batch.delete(doc(db, r.path))
+    await batch.commit()
+    n += Math.min(400, refs.length - i)
+  }
+  return n
+}
+
+async function refsByBuilding(colName: string, buildingId: string) {
+  const snap = await getDocs(query(col(colName), where('buildingId', '==', buildingId)))
+  return snap.docs.map((d) => ({ path: d.ref.path, id: d.id }))
+}
+
+/**
+ * ΟΡΙΣΤΙΚΗ διαγραφή κτιρίου και ΟΛΩΝ των δεδομένων του (superadmin only).
+ * Μη αναστρέψιμο. Δεν καθαρίζει αρχεία Storage (παραμένουν ανενεργά).
+ */
+export async function deleteBuildingCascade(buildingId: string): Promise<DeleteBuildingResult> {
+  const db = requireDb()
+  let deletedDocs = 0
+
+  // 1) Θυγατρικά σχόλια/προσφορές (ανά topic) & ψήφοι (ανά poll).
+  const topics = await refsByBuilding('topics', buildingId)
+  const polls = await refsByBuilding('polls', buildingId)
+  for (const t of topics) {
+    for (const child of ['comments', 'offers']) {
+      const snap = await getDocs(query(col(child), where('topicId', '==', t.id)))
+      deletedDocs += await deleteRefs(snap.docs.map((d) => ({ path: d.ref.path })))
+    }
+  }
+  for (const p of polls) {
+    const snap = await getDocs(query(col('votes'), where('pollId', '==', p.id)))
+    deletedDocs += await deleteRefs(snap.docs.map((d) => ({ path: d.ref.path })))
+  }
+
+  // 2) Όλες οι flat συλλογές με buildingId.
+  for (const c of BUILDING_COLLECTIONS) {
+    const refs = await refsByBuilding(c, buildingId)
+    deletedDocs += await deleteRefs(refs)
+  }
+
+  // 3) Μετρητής κτιρίου (doc id == buildingId).
+  await deleteDoc(doc(db, 'counters', buildingId)).catch(() => {})
+
+  // 4) Μέλη (υποσυλλογή).
+  const members = await getDocs(collection(db, 'buildings', buildingId, 'members'))
+  deletedDocs += await deleteRefs(members.docs.map((d) => ({ path: d.ref.path })))
+
+  // 5) Αφαίρεσε το κτίριο από τα buildingIds των χρηστών.
+  const users = await getDocs(query(col('users'), where('buildingIds', 'array-contains', buildingId)))
+  for (let i = 0; i < users.docs.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const u of users.docs.slice(i, i + 400)) {
+      batch.update(u.ref, { buildingIds: arrayRemove(buildingId) })
+    }
+    await batch.commit()
+  }
+
+  // 6) Το ίδιο το κτίριο.
+  await deleteDoc(doc(db, 'buildings', buildingId))
+  deletedDocs += 1
+
+  return { deletedDocs }
 }

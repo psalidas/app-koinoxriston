@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Building2, ExternalLink, Check, X } from 'lucide-react'
+import { Plus, Building2, ExternalLink, Check, X, Trash2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useAppData } from '@/lib/appData'
 import { Button, Card, PageHeader, Field, TextField, Badge } from '@/components/forms'
@@ -11,6 +11,7 @@ import {
   createBuilding,
   uniqueSlug,
   updateBuilding,
+  deleteBuildingCascade,
 } from '@/lib/repos/buildings'
 import { saveMember } from '@/lib/repos/members'
 import { addUserToBuilding } from '@/lib/repos/users'
@@ -41,6 +42,28 @@ export default function Buildings() {
   const [msg, setMsg] = useState<string | null>(null)
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
+  const [toDelete, setToDelete] = useState<Building | null>(null)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [delMsg, setDelMsg] = useState<string | null>(null)
+
+  async function runDelete() {
+    if (!toDelete) return
+    setDeleting(true)
+    try {
+      const name = toDelete.name
+      const r = await deleteBuildingCascade(toDelete.id)
+      setDelMsg(`Διαγράφηκε το «${name}» (${r.deletedDocs} εγγραφές).`)
+      setToDelete(null)
+      setConfirmText('')
+      await refresh()
+      await load()
+    } catch (e) {
+      setDelMsg('Σφάλμα διαγραφής: ' + ((e as Error).message || 'άγνωστο'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   async function runBackfill() {
     if (!confirm('Μετάβαση δεδομένων: θα δημιουργηθούν εγγραφές μελών & slug για τα υπάρχοντα κτίρια (χωρίς απώλεια). Συνέχεια;')) return
@@ -160,6 +183,9 @@ export default function Buildings() {
       {backfillMsg && (
         <div className="mb-3 rounded-md bg-blue-50 p-2 text-sm text-blue-700">{backfillMsg}</div>
       )}
+      {delMsg && (
+        <div className="mb-3 rounded-md bg-amber-50 p-2 text-sm text-amber-800">{delMsg}</div>
+      )}
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
@@ -217,6 +243,15 @@ export default function Buildings() {
                           {b.active !== false ? <X size={16} /> : <Check size={16} />}
                         </button>
                       )}
+                      {superadmin && (
+                        <button
+                          onClick={() => { setToDelete(b); setConfirmText(''); setDelMsg(null) }}
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                          title="Οριστική διαγραφή κτιρίου"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -267,6 +302,46 @@ export default function Buildings() {
           <p className="text-xs text-gray-400">
             Το URL θα δημιουργηθεί αυτόματα (π.χ. /b/venizelou-5). Οι πίνακες χιλιοστών προστίθενται προεπιλεγμένοι και μπορείτε να τους αλλάξετε.
           </p>
+        </div>
+      </Modal>
+
+      {/* Οριστική διαγραφή κτιρίου — διπλή επιβεβαίωση (superadmin). */}
+      <Modal
+        open={!!toDelete}
+        onClose={() => { if (!deleting) { setToDelete(null); setConfirmText('') } }}
+        title="Οριστική διαγραφή κτιρίου"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setToDelete(null); setConfirmText('') }} disabled={deleting}>
+              Ακύρωση
+            </Button>
+            <Button
+              variant="danger"
+              onClick={runDelete}
+              disabled={deleting || confirmText.trim() !== (toDelete?.name ?? '').trim()}
+            >
+              {deleting ? 'Διαγραφή…' : 'Οριστική διαγραφή'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm text-gray-700">
+          <div className="rounded-md bg-red-50 p-3 text-red-700">
+            <b>Προσοχή:</b> Η ενέργεια είναι <b>μη αναστρέψιμη</b>. Θα διαγραφούν οριστικά το κτίριο
+            «{toDelete?.name}» και <b>όλα τα δεδομένα του</b>: διαμερίσματα, δαπάνες, κοινόχρηστα,
+            πληρωμές, ταμείο, ανακοινώσεις, βλάβες, ψηφοφορίες, έγγραφα, μέλη/χρήστες κ.λπ.
+          </div>
+          <p>
+            Για επιβεβαίωση, πληκτρολογήστε το ακριβές όνομα του κτιρίου:
+            <br />
+            <code className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs">{toDelete?.name}</code>
+          </p>
+          <TextField
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="Όνομα κτιρίου"
+            autoFocus
+          />
         </div>
       </Modal>
     </div>

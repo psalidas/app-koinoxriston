@@ -273,7 +273,9 @@ service cloud.firestore {
     match /auditLogs/{id} {
       allow read: if isSuperadmin() || canManage(resource.data.buildingId);
       allow create: if isKnownUser() && request.resource.data.userEmail == uid();
-      allow update, delete: if false;
+      allow update: if false;
+      // Διαγραφή μόνο από superadmin (π.χ. οριστική διαγραφή κτιρίου).
+      allow delete: if isSuperadmin();
     }
   }
 }

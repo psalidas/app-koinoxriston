@@ -8,6 +8,10 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { buildings, building, setBuildingId } = useAppData()
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // Στον επιλογέα δείχνουμε μόνο τα ενεργά κτίρια (και το τρέχον, ώστε να μη
+  // μένει κενός ο επιλογέας αν βρίσκεσαι σε ανενεργό).
+  const switchable = buildings.filter((b) => b.active !== false || b.id === building?.id)
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2.5">
       <button
@@ -19,13 +23,13 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
       </button>
 
       <div className="min-w-0 flex-1">
-        {buildings.length > 1 ? (
+        {switchable.length > 1 ? (
           <select
             value={building?.id ?? ''}
             onChange={(e) => setBuildingId(e.target.value)}
             className="max-w-full truncate rounded-md border border-gray-200 bg-white px-2 py-1 text-sm font-medium text-gray-800"
           >
-            {buildings.map((b) => (
+            {switchable.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>

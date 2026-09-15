@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { money, formatDate } from '@/lib/format'
+import { money, formatDate, compareEl } from '@/lib/format'
 import type { Payment, PaymentMethod } from '@/types'
 import { PAYMENT_METHOD_LABELS } from '@/types'
 import { listPayments, createPayment, updatePayment, deletePayment } from '@/lib/repos/payments'
 import { logAudit } from '@/lib/audit'
+
+type SortKey = 'date' | 'apartment' | 'method' | 'note' | 'amount'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -26,6 +28,9 @@ export default function Payments() {
   const { building, apartments } = useAppData()
   const { isManager, user, profile } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
+  const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Payment | null>(null)
   const [toDelete, setToDelete] = useState<Payment | null>(null)
@@ -119,13 +124,63 @@ export default function Payments() {
     await load()
   }
 
-  const total = payments.reduce((s, p) => s + p.amount, 0)
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      // Οι αριθμοί/ημερομηνίες ξεκινούν φθίνουσα, το κείμενο αύξουσα.
+      setSortDir(key === 'amount' || key === 'date' ? 'desc' : 'asc')
+    }
+  }
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const filtered = q
+      ? payments.filter((p) => {
+          const hay = [
+            aptCode[p.apartmentId] ?? '',
+            aptOwner[p.apartmentId] ?? '',
+            PAYMENT_METHOD_LABELS[p.method],
+            p.note ?? '',
+            String(p.amount),
+            formatDate(p.date),
+          ]
+            .join(' ')
+            .toLowerCase()
+          return hay.includes(q)
+        })
+      : payments
+    const dir = sortDir === 'asc' ? 1 : -1
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortKey) {
+        case 'amount':
+          return (a.amount - b.amount) * dir
+        case 'apartment':
+          return compareEl(aptCode[a.apartmentId] ?? '', aptCode[b.apartmentId] ?? '') * dir
+        case 'method':
+          return compareEl(PAYMENT_METHOD_LABELS[a.method], PAYMENT_METHOD_LABELS[b.method]) * dir
+        case 'note':
+          return compareEl(a.note ?? '', b.note ?? '') * dir
+        case 'date':
+        default:
+          return ((a.date?.toMillis?.() ?? 0) - (b.date?.toMillis?.() ?? 0)) * dir
+      }
+    })
+    return sorted
+  }, [payments, search, sortKey, sortDir, aptCode, aptOwner])
+
+  const total = rows.reduce((s, p) => s + p.amount, 0)
 
   return (
     <div>
       <PageHeader
         title="Πληρωμές"
-        subtitle={`${payments.length} εισπράξεις · σύνολο ${money(total)}`}
+        subtitle={
+          search.trim()
+            ? `${rows.length} από ${payments.length} · σύνολο ${money(total)}`
+            : `${payments.length} εισπράξεις · σύνολο ${money(total)}`
+        }
         actions={
           isManager && (
             <Button onClick={openNew}>
@@ -135,27 +190,37 @@ export default function Payments() {
         }
       />
 
+      <div className="mb-3 relative max-w-sm">
+        <Search size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <TextField
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Αναζήτηση (διαμέρισμα, ιδιοκτήτης, σημείωση, ποσό…)"
+          className="pl-8"
+        />
+      </div>
+
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <th className="px-3 py-2">Ημ/νία</th>
-              <th className="px-3 py-2">Διαμ.</th>
-              <th className="px-3 py-2">Τρόπος</th>
-              <th className="px-3 py-2">Σημείωση</th>
-              <th className="px-3 py-2 text-right">Ποσό</th>
+              <SortTh label="Ημ/νία" k="date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh label="Διαμ." k="apartment" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh label="Τρόπος" k="method" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh label="Σημείωση" k="note" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortTh label="Ποσό" k="amount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {payments.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-gray-400">
-                  Δεν υπάρχουν πληρωμές.
+                  {search.trim() ? 'Κανένα αποτέλεσμα.' : 'Δεν υπάρχουν πληρωμές.'}
                 </td>
               </tr>
             )}
-            {payments.map((p) => (
+            {rows.map((p) => (
               <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 text-gray-600">{formatDate(p.date)}</td>
                 <td className="px-3 py-2">
@@ -258,5 +323,37 @@ export default function Payments() {
         onConfirm={confirmDelete}
       />
     </div>
+  )
+}
+
+function SortTh({
+  label,
+  k,
+  sortKey,
+  sortDir,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  k: SortKey
+  sortKey: SortKey
+  sortDir: 'asc' | 'desc'
+  onSort: (k: SortKey) => void
+  align?: 'left' | 'right'
+}) {
+  const active = sortKey === k
+  const Icon = !active ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown
+  return (
+    <th className="px-3 py-2">
+      <button
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 uppercase hover:text-gray-700 ${
+          align === 'right' ? 'w-full justify-end' : ''
+        } ${active ? 'text-gray-700' : ''}`}
+      >
+        {label}
+        <Icon size={13} className={active ? 'text-blue-500' : 'text-gray-300'} />
+      </button>
+    </th>
   )
 }

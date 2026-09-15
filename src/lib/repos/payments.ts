@@ -5,6 +5,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { col, clean, requireDb } from '../db'
@@ -31,6 +32,10 @@ export async function createPayment(data: Omit<Payment, 'id'>): Promise<string> 
     createdAt: serverTimestamp(),
   })
   return ref.id
+}
+
+export async function updatePayment(id: string, patch: Partial<Payment>): Promise<void> {
+  await updateDoc(doc(requireDb(), 'payments', id), clean(patch))
 }
 
 export async function deletePayment(id: string): Promise<void> {

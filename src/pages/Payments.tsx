@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
@@ -9,11 +9,17 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { money, formatDate } from '@/lib/format'
 import type { Payment, PaymentMethod } from '@/types'
 import { PAYMENT_METHOD_LABELS } from '@/types'
-import { listPayments, createPayment, deletePayment } from '@/lib/repos/payments'
+import { listPayments, createPayment, updatePayment, deletePayment } from '@/lib/repos/payments'
 import { logAudit } from '@/lib/audit'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
+}
+
+/** Timestamp/Date → YYYY-MM-DD για το input ημερομηνίας. */
+function toISODate(d: Payment['date']): string {
+  const dt = d?.toDate?.() ?? (d ? new Date(d as unknown as string) : new Date())
+  return dt.toISOString().slice(0, 10)
 }
 
 export default function Payments() {
@@ -21,6 +27,7 @@ export default function Payments() {
   const { isManager, user, profile } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Payment | null>(null)
   const [toDelete, setToDelete] = useState<Payment | null>(null)
   const [form, setForm] = useState({
     apartmentId: '',
@@ -46,13 +53,32 @@ export default function Payments() {
     return m
   }, [apartments])
 
+  const aptOwner = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const a of apartments) m[a.id] = a.ownerName ?? ''
+    return m
+  }, [apartments])
+
   function openNew() {
+    setEditing(null)
     setForm({
       apartmentId: apartments[0]?.id ?? '',
       amount: 0,
       date: todayISO(),
       method: 'cash',
       note: '',
+    })
+    setModalOpen(true)
+  }
+
+  function openEdit(p: Payment) {
+    setEditing(p)
+    setForm({
+      apartmentId: p.apartmentId,
+      amount: p.amount,
+      date: toISODate(p.date),
+      method: p.method,
+      note: p.note ?? '',
     })
     setModalOpen(true)
   }
@@ -67,17 +93,22 @@ export default function Payments() {
       method: form.method,
       note: form.note.trim() || undefined,
     }
-    await createPayment(data)
+    if (editing) {
+      await updatePayment(editing.id, data)
+    } else {
+      await createPayment(data)
+    }
     await logAudit({
       buildingId: building.id,
       userEmail: user?.email ?? '',
       userName: profile?.name ?? user?.email ?? '',
-      action: 'create',
+      action: editing ? 'update' : 'create',
       entity: 'payment',
-      entityId: form.apartmentId,
+      entityId: editing?.id ?? form.apartmentId,
       after: { amount: data.amount, apartment: aptCode[form.apartmentId] },
     })
     setModalOpen(false)
+    setEditing(null)
     await load()
   }
 
@@ -127,7 +158,12 @@ export default function Payments() {
             {payments.map((p) => (
               <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-3 py-2 text-gray-600">{formatDate(p.date)}</td>
-                <td className="px-3 py-2 font-medium text-gray-900">{aptCode[p.apartmentId] ?? '—'}</td>
+                <td className="px-3 py-2">
+                  <div className="font-medium text-gray-900">{aptCode[p.apartmentId] ?? '—'}</div>
+                  {aptOwner[p.apartmentId] && (
+                    <div className="text-xs text-gray-500">{aptOwner[p.apartmentId]}</div>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <Badge>{PAYMENT_METHOD_LABELS[p.method]}</Badge>
                 </td>
@@ -135,12 +171,22 @@ export default function Payments() {
                 <td className="px-3 py-2 text-right tnum font-medium text-green-700">{money(p.amount)}</td>
                 <td className="px-3 py-2">
                   {isManager && (
-                    <button
-                      onClick={() => setToDelete(p)}
-                      className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-blue-600"
+                        title="Επεξεργασία"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => setToDelete(p)}
+                        className="rounded p-1 text-gray-300 hover:bg-gray-100 hover:text-red-600"
+                        title="Διαγραφή"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
@@ -151,11 +197,11 @@ export default function Payments() {
 
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Νέα πληρωμή"
+        onClose={() => { setModalOpen(false); setEditing(null) }}
+        title={editing ? 'Επεξεργασία πληρωμής' : 'Νέα πληρωμή'}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
+            <Button variant="secondary" onClick={() => { setModalOpen(false); setEditing(null) }}>
               Ακύρωση
             </Button>
             <Button onClick={save}>Αποθήκευση</Button>

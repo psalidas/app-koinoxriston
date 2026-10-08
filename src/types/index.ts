@@ -83,6 +83,11 @@ export interface Building {
   heatingClosedPercent: number
   /** Προθεσμία πληρωμής σε ημέρες μετά την έκδοση (προεπιλογή 30). */
   paymentDueDays?: number
+  /** Πρότυπα ειδοποίησης έκδοσης κοινοχρήστων (placeholders: {name} {apts}
+   *  {amount} {period} {due} {iban} {bank} {company} {building} {link}). */
+  noticeEmailSubject?: string
+  noticeEmailTemplate?: string
+  noticeSmsTemplate?: string
   createdAt?: Timestamp
 }
 

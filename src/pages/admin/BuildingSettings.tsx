@@ -5,6 +5,12 @@ import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField } from '@/components/forms'
 import type { Building, MillesimeScale } from '@/types'
 import { saveBuilding } from '@/lib/repos/buildings'
+import {
+  NOTICE_PLACEHOLDERS,
+  defaultNoticeEmailSubject,
+  defaultNoticeEmailTemplate,
+  defaultNoticeSmsTemplate,
+} from '@/lib/noticeTemplate'
 import { logAudit } from '@/lib/audit'
 
 function slug(label: string): string {
@@ -151,6 +157,46 @@ export default function BuildingSettings() {
                   onChange={(e) => set('paymentDueDays', Number(e.target.value))}
                 />
               </Field>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="mb-1 font-semibold text-gray-900">Πρότυπα ειδοποίησης έκδοσης</h2>
+            <p className="mb-3 text-xs text-gray-500">
+              Χρησιμοποιούνται στην «Ειδοποίηση έκδοσης» κοινοχρήστων. Μεταβλητές:{' '}
+              {NOTICE_PLACEHOLDERS.map((p) => (
+                <code key={p} className="mx-0.5 rounded bg-gray-100 px-1 py-0.5 text-[11px]">{p}</code>
+              ))}
+            </p>
+            <div className="space-y-3">
+              <Field label="Θέμα email">
+                <TextField
+                  value={form.noticeEmailSubject ?? ''}
+                  onChange={(e) => set('noticeEmailSubject', e.target.value)}
+                  placeholder={defaultNoticeEmailSubject()}
+                />
+              </Field>
+              <Field label="Κείμενο email">
+                <textarea
+                  rows={9}
+                  value={form.noticeEmailTemplate ?? ''}
+                  onChange={(e) => set('noticeEmailTemplate', e.target.value)}
+                  placeholder={defaultNoticeEmailTemplate()}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </Field>
+              <Field label="Κείμενο SMS">
+                <textarea
+                  rows={4}
+                  value={form.noticeSmsTemplate ?? ''}
+                  onChange={(e) => set('noticeSmsTemplate', e.target.value)}
+                  placeholder={defaultNoticeSmsTemplate()}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </Field>
+              <p className="text-xs text-gray-400">
+                Αν τα αφήσετε κενά, χρησιμοποιούνται τα προεπιλεγμένα κείμενα (όπως φαίνονται ως υπόδειξη).
+              </p>
             </div>
           </Card>
 

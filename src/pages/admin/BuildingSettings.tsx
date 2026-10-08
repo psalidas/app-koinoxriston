@@ -111,14 +111,20 @@ export default function BuildingSettings() {
             <Field label="Διαχειριστής">
               <TextField value={form.managerName} onChange={(e) => set('managerName', e.target.value)} />
             </Field>
+            <Field label="Επωνυμία δικαιούχου (προαιρετικό)" hint="Εμφανίζεται στο μπλοκ πληρωμής του ειδοποιητηρίου.">
+              <TextField value={form.companyName ?? ''} onChange={(e) => set('companyName', e.target.value)} />
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Τράπεζα (προαιρετικό)">
+                <TextField value={form.bankName ?? ''} onChange={(e) => set('bankName', e.target.value)} />
+              </Field>
               <Field label="ΙΒΑΝ (προαιρετικό)">
                 <TextField value={form.iban ?? ''} onChange={(e) => set('iban', e.target.value)} />
               </Field>
-              <Field label="ΑΦΜ (προαιρετικό)">
-                <TextField value={form.afm ?? ''} onChange={(e) => set('afm', e.target.value)} />
-              </Field>
             </div>
+            <Field label="ΑΦΜ (προαιρετικό)">
+              <TextField value={form.afm ?? ''} onChange={(e) => set('afm', e.target.value)} />
+            </Field>
           </div>
         </Card>
 
@@ -137,6 +143,12 @@ export default function BuildingSettings() {
                 <NumberField
                   value={form.heatingClosedPercent}
                   onChange={(e) => set('heatingClosedPercent', Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Προθεσμία πληρωμής (ημέρες)" hint="Ημέρες μετά την έκδοση για εξόφληση (προεπιλογή 30).">
+                <NumberField
+                  value={form.paymentDueDays ?? 30}
+                  onChange={(e) => set('paymentDueDays', Number(e.target.value))}
                 />
               </Field>
             </div>

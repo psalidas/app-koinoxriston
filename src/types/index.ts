@@ -70,6 +70,10 @@ export interface Building {
   /** Ενεργό κτίριο (false = αρχειοθετημένο). */
   active?: boolean
   iban?: string
+  /** Όνομα τράπεζας (εμφανίζεται στο μπλοκ πληρωμής). */
+  bankName?: string
+  /** Επωνυμία δικαιούχου λογαριασμού (εμφανίζεται στο μπλοκ πληρωμής). */
+  companyName?: string
   afm?: string
   /** Editable millesime tables. Each apartment carries a value per scale. */
   scales: MillesimeScale[]
@@ -77,6 +81,8 @@ export interface Building {
   billingFeePerApartment: number
   /** Κλειστά %: share of heating a closed apartment still pays (0–100). */
   heatingClosedPercent: number
+  /** Προθεσμία πληρωμής σε ημέρες μετά την έκδοση (προεπιλογή 30). */
+  paymentDueDays?: number
   createdAt?: Timestamp
 }
 

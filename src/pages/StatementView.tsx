@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, Download, CheckCircle2, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowLeft, Printer, Download, CheckCircle2, RefreshCw, Trash2, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Badge } from '@/components/forms'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { StatementNotifyModal } from '@/components/StatementNotifyModal'
 import { Footer } from '@/components/Footer'
 import { amount, mille, formatDate } from '@/lib/format'
 import type { ExpenseGroup, Statement } from '@/types'
@@ -31,6 +32,7 @@ export default function StatementView() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showNotify, setShowNotify] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -126,6 +128,11 @@ export default function StatementView() {
                 <Printer size={18} /> Όλες οι αποδείξεις
               </Button>
             </>
+          )}
+          {isManager && st.status === 'issued' && (
+            <Button onClick={() => setShowNotify(true)}>
+              <Send size={18} /> Ειδοποίηση έκδοσης
+            </Button>
           )}
           {isManager && st.status !== 'issued' && st.kind !== 'special' && (
             <Button variant="secondary" onClick={refreshDraft} disabled={busy}>
@@ -387,6 +394,15 @@ export default function StatementView() {
         onCancel={() => setShowDelete(false)}
         onConfirm={remove}
       />
+
+      {building && (
+        <StatementNotifyModal
+          st={st}
+          building={building}
+          open={showNotify}
+          onClose={() => setShowNotify(false)}
+        />
+      )}
     </div>
   )
 }

@@ -19,7 +19,9 @@ export interface BulkResult {
 export async function sendBulkMessage(input: {
   channel: 'email' | 'sms'
   subject?: string
-  body: string
+  body?: string
+  /** Προαιρετικά εξατομικευμένα κείμενα ανά παραλήπτη (id → κείμενο). */
+  bodies?: Record<string, string>
   recipientIds: string[]
 }): Promise<BulkResult> {
   if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')

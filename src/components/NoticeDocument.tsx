@@ -1,7 +1,6 @@
 import { money, amount, mille, formatDate } from '@/lib/format'
 import type { ExpenseGroup, Statement, StatementRow } from '@/types'
 import { GROUP_LABELS, GROUP_ORDER, GROUP_SCALE_KEY } from '@/types'
-import { rfReference, groupRef } from '@/lib/paymentRef'
 import { Footer } from './Footer'
 
 /** Το σώμα ενός ατομικού ειδοποιητηρίου (κοινό για single & μαζική εκτύπωση). */
@@ -9,18 +8,27 @@ export function NoticeDocument({
   st,
   row,
   iban,
-  qr,
+  bankName,
+  companyName,
+  dueDays = 30,
   area,
 }: {
   st: Statement
   row: StatementRow
   iban: string
-  qr: string | null
+  /** Όνομα τράπεζας (προαιρετικό — από τις ρυθμίσεις). */
+  bankName?: string
+  /** Επωνυμία δικαιούχου (προαιρετικό — από τις ρυθμίσεις). */
+  companyName?: string
+  /** Προθεσμία πληρωμής σε ημέρες μετά την έκδοση (προεπιλογή 30). */
+  dueDays?: number
   /** Περιοχή κτιρίου (προαιρετικό — από τις ρυθμίσεις). */
   area?: string
 }) {
-  const reference = rfReference(`${st.buildingCode}${row.code}${st.period}`)
   const showBilling = (st.totals.billingFees ?? 0) !== 0
+  // Προθεσμία πληρωμής = ημερομηνία έκδοσης + dueDays.
+  const issued = st.createdAt?.toDate?.() ?? null
+  const dueDate = issued ? new Date(issued.getTime() + dueDays * 86400000) : null
   // Σύνολο χιλιοστών πολυκατοικίας ανά κλίμακα (για τη στήλη «Χιλ. πολ/κίας»).
   const buildingMille = (scaleKey: string) =>
     st.rows.reduce((s, r) => s + (r.millesimes[scaleKey] ?? 0), 0)
@@ -149,23 +157,42 @@ export function NoticeDocument({
         </div>
       </div>
 
-      {/* Πληρωμή (IBAN / QR) */}
+      {/* Πληρωμή (IBAN) */}
       <div className="mt-3 rounded-md border border-gray-200 p-3">
         <div className="mb-2 text-xs font-semibold uppercase text-gray-500">Πληρωμή</div>
         {iban ? (
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 text-xs">
-              <div className="text-gray-500">IBAN</div>
-              <div className="break-all font-mono">{iban}</div>
-              <div className="mt-2 text-gray-500">Κωδικός πληρωμής (RF)</div>
-              <div className="break-all font-mono">{groupRef(reference)}</div>
-            </div>
-            {qr && <img src={qr} alt="QR πληρωμής" className="h-28 w-28 shrink-0" />}
+          <div className="text-xs">
+            {companyName && (
+              <>
+                <div className="text-gray-500">Δικαιούχος</div>
+                <div className="font-medium">{companyName}</div>
+              </>
+            )}
+            {bankName && (
+              <>
+                <div className="mt-2 text-gray-500">Τράπεζα</div>
+                <div>{bankName}</div>
+              </>
+            )}
+            <div className="mt-2 text-gray-500">IBAN</div>
+            <div className="break-all font-mono">{iban}</div>
+            {dueDate && (
+              <div className="mt-2 font-semibold text-red-700">
+                Προθεσμία πληρωμής: {formatDate(dueDate)}
+              </div>
+            )}
           </div>
         ) : (
-          <p className="text-xs text-gray-400">
-            Ορίστε ΙΒΑΝ στις «Ρυθμίσεις κτιρίου» για να εμφανίζεται κωδικός & QR πληρωμής.
-          </p>
+          <>
+            <p className="text-xs text-gray-400">
+              Ορίστε ΙΒΑΝ στις «Ρυθμίσεις κτιρίου» για να εμφανίζεται το μπλοκ πληρωμής.
+            </p>
+            {dueDate && (
+              <p className="mt-2 text-xs font-semibold text-red-700">
+                Προθεσμία πληρωμής: {formatDate(dueDate)}
+              </p>
+            )}
+          </>
         )}
       </div>
 

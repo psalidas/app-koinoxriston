@@ -52,6 +52,10 @@ export const sendBulkMessage = onCall(
     const channel = request.data?.channel
     const subject = typeof request.data?.subject === 'string' ? request.data.subject.trim() : ''
     const body = typeof request.data?.body === 'string' ? request.data.body.trim() : ''
+    // Προαιρετικά εξατομικευμένα κείμενα ανά παραλήπτη (id → body), π.χ.
+    // ειδοποίηση κοινοχρήστων με το ποσό του κάθε διαμερίσματος.
+    const bodies: Record<string, string> =
+      request.data?.bodies && typeof request.data.bodies === 'object' ? request.data.bodies : {}
     const recipientIds: string[] = Array.isArray(request.data?.recipientIds)
       ? request.data.recipientIds.filter((x: unknown): x is string => typeof x === 'string' && !!x.trim()).map((x: string) => x.trim())
       : []
@@ -59,7 +63,8 @@ export const sendBulkMessage = onCall(
     if (channel !== 'email' && channel !== 'sms') {
       throw new HttpsError('invalid-argument', 'Άγνωστο κανάλι (email/sms).')
     }
-    if (!body) throw new HttpsError('invalid-argument', 'Λείπει το μήνυμα.')
+    const hasPerRecipient = Object.keys(bodies).length > 0
+    if (!body && !hasPerRecipient) throw new HttpsError('invalid-argument', 'Λείπει το μήνυμα.')
     if (channel === 'email' && !subject) {
       throw new HttpsError('invalid-argument', 'Λείπει το θέμα του email.')
     }
@@ -82,7 +87,6 @@ export const sendBulkMessage = onCall(
       throw new HttpsError('failed-precondition', 'Λείπει το SMSTO_API_KEY (GitHub secret / functions env).')
     }
 
-    const html = channel === 'email' ? textToHtml(body) : ''
     const results: BulkResultRow[] = []
 
     // Ακολουθιακά — για μικρές πολυκατοικίες είναι απλό & ασφαλές έναντι
@@ -97,6 +101,14 @@ export const sendBulkMessage = onCall(
         const data = snap.data() as { name?: string; phone?: string; active?: boolean }
         const name = typeof data.name === 'string' ? data.name : ''
 
+        // Εξατομικευμένο ή κοινό κείμενο.
+        const thisBody =
+          typeof bodies[id] === 'string' && bodies[id].trim() ? bodies[id].trim() : body
+        if (!thisBody) {
+          results.push({ id, ok: false, reason: 'Λείπει μήνυμα για τον παραλήπτη.' })
+          continue
+        }
+
         if (channel === 'email') {
           if (!isEmail(id)) {
             results.push({ id, ok: false, reason: 'Χωρίς email.' })
@@ -106,7 +118,7 @@ export const sendBulkMessage = onCall(
             toEmail: id,
             toName: name || undefined,
             subject,
-            html,
+            html: textToHtml(thisBody),
             fromEmail: cfg.fromEmail,
             fromName: cfg.fromName,
             cc: cfg.ccEmail,
@@ -119,7 +131,7 @@ export const sendBulkMessage = onCall(
           }
           await sendSmsTo(process.env.SMSTO_API_KEY!, {
             to: normPhone(phoneRaw),
-            message: body,
+            message: thisBody,
             sender: cfg.smsSender,
           })
         }

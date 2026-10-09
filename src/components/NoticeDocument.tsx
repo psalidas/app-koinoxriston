@@ -159,7 +159,7 @@ export function NoticeDocument({
           Προηγούμενες οφειλές: <span className="tnum">{amount(row.previousBalance)}</span>
         </div>
         <div className={`${cell} bg-blue-50`}>
-          <b>ΠΟΣΟ ΠΟΥ ΠΡΕΠΕΙ ΝΑ ΠΛΗΡΩΣΕΙ: </b>
+          <b>ΠΟΣΟ ΠΛΗΡΩΜΗΣ: </b>
           <b className="tnum text-blue-900">{money(row.total)}</b>
         </div>
       </div>

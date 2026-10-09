@@ -20,6 +20,8 @@ export interface BrevoEmailParams {
   fromName: string
   /** Προαιρετικό CC — δεν προστίθεται αν ταυτίζεται με τον παραλήπτη. */
   cc?: string
+  /** Προαιρετικά συνημμένα: name + base64 content. */
+  attachments?: { name: string; content: string }[]
 }
 
 export async function sendBrevoEmail(apiKey: string, params: BrevoEmailParams): Promise<void> {
@@ -32,6 +34,9 @@ export async function sendBrevoEmail(apiKey: string, params: BrevoEmailParams): 
   const cc = params.cc?.trim()
   if (cc && cc.toLowerCase() !== params.toEmail.trim().toLowerCase()) {
     body.cc = [{ email: cc }]
+  }
+  if (params.attachments && params.attachments.length) {
+    body.attachment = params.attachments.map((a) => ({ name: a.name, content: a.content }))
   }
 
   let resp: Response

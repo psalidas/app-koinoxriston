@@ -20,6 +20,7 @@ export { sendTestInvite } from './invites/sendTest'
 // Μαζική αποστολή email/SMS σε επιλεγμένους χρήστες (Διαχείριση → Μαζική
 // αποστολή). Ίδιοι πάροχοι/ρυθμίσεις με τις προσκλήσεις.
 export { sendBulkMessage } from './messaging/sendBulk'
+export { sendEmailWithAttachments } from './messaging/sendEmailWithAttachments'
 
 // Magic-link login (email μέσω Brevo / κινητό μέσω sms.to) — ενιαίο για
 // πρόσκληση & κάθε login. requestMagicLink στέλνει σύνδεσμο, redeemMagicLink

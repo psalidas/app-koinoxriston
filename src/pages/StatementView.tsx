@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, Download, CheckCircle2, RefreshCw, Trash2, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
@@ -33,6 +33,7 @@ export default function StatementView() {
   const [busy, setBusy] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [showNotify, setShowNotify] = useState(false)
+  const sheetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!id) return
@@ -152,7 +153,7 @@ export default function StatementView() {
         </div>
       </div>
 
-      <div className="print-area print-landscape rounded-lg border border-gray-200 bg-white p-4 text-[11px] text-gray-900 shadow-sm">
+      <div ref={sheetRef} className="print-area print-landscape rounded-lg border border-gray-200 bg-white p-4 text-[11px] text-gray-900 shadow-sm">
         {/* Header */}
         <div className="mb-3 border-b border-gray-300 pb-2 text-center">
           <h1 className="text-base font-bold tracking-wide">ΣΥΓΚΕΝΤΡΩΤΙΚΗ ΚΑΤΑΣΤΑΣΗ ΔΑΠΑΝΩΝ</h1>
@@ -400,6 +401,7 @@ export default function StatementView() {
           st={st}
           building={building}
           apartments={apartments}
+          statementNode={() => sheetRef.current}
           open={showNotify}
           onClose={() => setShowNotify(false)}
         />

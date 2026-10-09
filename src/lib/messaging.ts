@@ -29,3 +29,17 @@ export async function sendBulkMessage(input: {
   const res = await fn(input)
   return res.data
 }
+
+/** Αποστολή ενός email με συνημμένα PDF σε έναν παραλήπτη. */
+export async function sendEmailWithAttachments(input: {
+  to: string
+  toName?: string
+  subject: string
+  body: string
+  attachments: { name: string; content: string }[]
+}): Promise<{ ok: true }> {
+  if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')
+  const fn = httpsCallable<typeof input, { ok: true }>(functions, 'sendEmailWithAttachments')
+  const res = await fn(input)
+  return res.data
+}

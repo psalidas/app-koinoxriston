@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Mail, Smartphone, Layers, Send, CheckCircle2, XCircle } from 'lucide-react'
 import { Button, Field, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
+import { NoticeDocument } from '@/components/NoticeDocument'
 import { money, formatDate } from '@/lib/format'
-import type { Building, Statement, UserDoc, Apartment } from '@/types'
+import type { Building, Statement, StatementRow, UserDoc, Apartment } from '@/types'
 import { listUsersByBuildings } from '@/lib/repos/users'
-import { sendBulkMessage } from '@/lib/messaging'
+import { sendBulkMessage, sendEmailWithAttachments } from '@/lib/messaging'
 import { paymentCodeFor } from '@/lib/paymentCode'
+import { elementToPdfBase64, nodeToPdfBase64 } from '@/lib/pdf'
 import {
   renderNotice,
   defaultNoticeEmailSubject,
@@ -27,6 +29,8 @@ function phoneOf(u: UserDoc): string {
 
 interface Recipient {
   user: UserDoc
+  ids: string[]
+  rows: StatementRow[]
   codes: string[]
   refs: string[]
   totalDue: number
@@ -41,18 +45,23 @@ export function StatementNotifyModal({
   st,
   building,
   apartments,
+  statementNode,
   open,
   onClose,
 }: {
   st: Statement
   building: Building
   apartments: Apartment[]
+  /** Επιστρέφει το DOM node της συγκεντρωτικής (για το συνημμένο PDF). */
+  statementNode?: () => HTMLElement | null
   open: boolean
   onClose: () => void
 }) {
   const [users, setUsers] = useState<UserDoc[]>([])
   const [loading, setLoading] = useState(true)
   const [channel, setChannel] = useState<Channel>('email')
+  const [attachPdf, setAttachPdf] = useState(true)
+  const [progress, setProgress] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [emailSubject, setEmailSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
@@ -93,6 +102,8 @@ export function StatementNotifyModal({
       const phoneId = phoneOf(u)
       out.push({
         user: u,
+        ids,
+        rows,
         codes: rows.map((r) => r.code),
         refs: ids.map((id) => paymentCodeFor(aptById.get(id), st.buildingCode, rowByApt.get(id)!.code)),
         totalDue: rows.reduce((s, r) => s + r.total, 0),
@@ -167,25 +178,73 @@ export function StatementNotifyModal({
     setSending(true)
     setError(null)
     setLines(null)
+    setProgress(null)
     const collected: SendLine[] = []
     try {
       if (wantEmail) {
         const rs = selectedList.filter((r) => r.byEmail)
         if (rs.length) {
-          const bodies: Record<string, string> = {}
-          rs.forEach((r) => (bodies[r.user.email] = renderNotice(emailBody, varsFor(r))))
-          const res = await sendBulkMessage({
-            channel: 'email',
-            subject: renderNotice(emailSubject, constVars),
-            bodies,
-            recipientIds: rs.map((r) => r.user.email),
-          })
-          res.results.forEach((x) => collected.push({ ...x, channel: 'email' }))
+          if (attachPdf) {
+            // Εξατομικευμένα συνημμένα PDF ανά παραλήπτη (μία κλήση ανά email).
+            setProgress('Δημιουργία PDF συγκεντρωτικής…')
+            let statementAtt: { name: string; content: string } | null = null
+            const node = statementNode?.()
+            if (node) {
+              const b64 = await nodeToPdfBase64(node, 'landscape')
+              statementAtt = { name: `Katastasi_${st.period}.pdf`, content: b64 }
+            }
+            let done = 0
+            for (const r of rs) {
+              done++
+              setProgress(`Αποστολή email με PDF (${done}/${rs.length})…`)
+              try {
+                const notices: { name: string; content: string }[] = []
+                for (let k = 0; k < r.ids.length; k++) {
+                  const b64 = await elementToPdfBase64(
+                    <NoticeDocument
+                      st={st}
+                      row={r.rows[k]}
+                      iban={iban}
+                      bankName={building.bankName}
+                      companyName={building.companyName}
+                      paymentCode={r.refs[k]}
+                      dueDays={building.paymentDueDays}
+                      area={building.area}
+                    />,
+                    { widthPx: 760, orientation: 'portrait' },
+                  )
+                  notices.push({ name: `Eidopoiitirio_${r.refs[k]}.pdf`, content: b64 })
+                }
+                await sendEmailWithAttachments({
+                  to: r.user.email,
+                  toName: r.user.name,
+                  subject: renderNotice(emailSubject, constVars),
+                  body: renderNotice(emailBody, varsFor(r)),
+                  attachments: [...(statementAtt ? [statementAtt] : []), ...notices],
+                })
+                collected.push({ id: r.user.email, ok: true, channel: 'email' })
+              } catch (e) {
+                collected.push({ id: r.user.email, ok: false, reason: (e as Error).message, channel: 'email' })
+              }
+            }
+          } else {
+            setProgress('Αποστολή email…')
+            const bodies: Record<string, string> = {}
+            rs.forEach((r) => (bodies[r.user.email] = renderNotice(emailBody, varsFor(r))))
+            const res = await sendBulkMessage({
+              channel: 'email',
+              subject: renderNotice(emailSubject, constVars),
+              bodies,
+              recipientIds: rs.map((r) => r.user.email),
+            })
+            res.results.forEach((x) => collected.push({ ...x, channel: 'email' }))
+          }
         }
       }
       if (wantSms) {
         const rs = selectedList.filter((r) => r.bySms)
         if (rs.length) {
+          setProgress('Αποστολή SMS…')
           const bodies: Record<string, string> = {}
           rs.forEach((r) => (bodies[r.user.email] = renderNotice(smsBody, varsFor(r))))
           const res = await sendBulkMessage({
@@ -201,6 +260,7 @@ export function StatementNotifyModal({
       setError((e as Error).message || 'Αποτυχία αποστολής.')
     } finally {
       setSending(false)
+      setProgress(null)
     }
   }
 
@@ -224,7 +284,7 @@ export function StatementNotifyModal({
         <>
           <Button variant="secondary" onClick={onClose}>Κλείσιμο</Button>
           <Button onClick={doSend} disabled={!canSend || sending}>
-            <Send size={16} /> {sending ? 'Αποστολή…' : `Αποστολή (${selectedList.length})`}
+            <Send size={16} /> {sending ? (progress ?? 'Αποστολή…') : `Αποστολή (${selectedList.length})`}
           </Button>
         </>
       }
@@ -311,6 +371,15 @@ export function StatementNotifyModal({
           {wantEmail && (
             <div className="space-y-2 rounded-md border border-gray-200 p-3">
               <div className="text-xs font-semibold uppercase text-gray-500">Email</div>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={attachPdf} onChange={(e) => setAttachPdf(e.target.checked)} />
+                Επισύναψη PDF (ειδοποιητήριο/-α του παραλήπτη + συγκεντρωτική)
+              </label>
+              {attachPdf && (
+                <p className="text-xs text-gray-400">
+                  Η δημιουργία των PDF γίνεται στον browser· για πολλούς παραλήπτες μπορεί να πάρει λίγη ώρα — μην κλείσετε το παράθυρο.
+                </p>
+              )}
               <Field label="Θέμα">
                 <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none" />
               </Field>

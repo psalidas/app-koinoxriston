@@ -109,15 +109,15 @@ export function NoticeDocument({
             const scaleKey = GROUP_SCALE_KEY[g]
             const lines = linesByGroup(g)
             return (
-              <tr key={g} className="align-top" style={idx % 2 === 1 ? { backgroundColor: '#f1f3f5' } : undefined}>
+              <tr key={g} className="align-middle" style={idx % 2 === 1 ? { backgroundColor: '#f1f3f5' } : undefined}>
                 <td className={`${cell} font-semibold`}>{GROUP_LABELS[g]}</td>
                 <td className={cell}>
                   <table className="w-full">
                     <tbody>
                       {lines.map((l, i) => (
                         <tr key={i}>
-                          <td className="pr-2 align-top">{l.category}</td>
-                          <td className="tnum whitespace-nowrap text-right align-top">{amount(l.amount)}</td>
+                          <td className="pr-2">{l.category}</td>
+                          <td className="tnum whitespace-nowrap text-right">{amount(l.amount)}</td>
                         </tr>
                       ))}
                     </tbody>

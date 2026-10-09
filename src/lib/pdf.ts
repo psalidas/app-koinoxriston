@@ -7,8 +7,8 @@ import type { ReactElement } from 'react'
 type Orientation = 'portrait' | 'landscape'
 
 /** Μετατρέπει ένα DOM node σε PDF (base64, χωρίς το data: prefix), με σωστή
- *  σελιδοποίηση A4. Χρησιμοποιεί html2canvas ώστε τα ελληνικά να αποδίδονται
- *  πάντα σωστά (raster της πραγματικής απόδοσης του browser). */
+ *  σελιδοποίηση A4 και περιθώρια σε κάθε σελίδα. Χρησιμοποιεί html2canvas ώστε
+ *  τα ελληνικά να αποδίδονται πάντα σωστά. */
 export async function nodeToPdfBase64(node: HTMLElement, orientation: Orientation = 'portrait'): Promise<string> {
   const canvas = await html2canvas(node, {
     scale: 2,
@@ -16,21 +16,33 @@ export async function nodeToPdfBase64(node: HTMLElement, orientation: Orientatio
     backgroundColor: '#ffffff',
     windowWidth: node.scrollWidth,
   })
-  const img = canvas.toDataURL('image/jpeg', 0.92)
   const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' })
+  const margin = 8 // mm περιθώριο σε κάθε πλευρά
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
-  const imgW = pageW
-  const imgH = (canvas.height * pageW) / canvas.width
-  let heightLeft = imgH
-  let position = 0
-  pdf.addImage(img, 'JPEG', 0, position, imgW, imgH)
-  heightLeft -= pageH
-  while (heightLeft > 0) {
-    position -= pageH
-    pdf.addPage()
-    pdf.addImage(img, 'JPEG', 0, position, imgW, imgH)
-    heightLeft -= pageH
+  const printW = pageW - margin * 2
+  const printH = pageH - margin * 2
+  // Πόσα pixel της πηγής αντιστοιχούν σε ύψος μίας σελίδας (με βάση το πλάτος).
+  const pxPerMm = canvas.width / printW
+  const pageSlicePx = printH * pxPerMm
+
+  let srcY = 0
+  let firstPage = true
+  while (srcY < canvas.height - 1) {
+    const sliceH = Math.min(pageSlicePx, canvas.height - srcY)
+    const tmp = document.createElement('canvas')
+    tmp.width = canvas.width
+    tmp.height = Math.ceil(sliceH)
+    const ctx = tmp.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, tmp.width, tmp.height)
+    ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+    const sliceImg = tmp.toDataURL('image/jpeg', 0.92)
+    const dispH = sliceH / pxPerMm
+    if (!firstPage) pdf.addPage()
+    pdf.addImage(sliceImg, 'JPEG', margin, margin, printW, dispH)
+    srcY += sliceH
+    firstPage = false
   }
   const uri = pdf.output('datauristring')
   return uri.slice(uri.indexOf(',') + 1)

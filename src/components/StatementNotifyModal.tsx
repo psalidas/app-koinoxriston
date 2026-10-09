@@ -3,9 +3,10 @@ import { Mail, Smartphone, Layers, Send, CheckCircle2, XCircle } from 'lucide-re
 import { Button, Field, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { money, formatDate } from '@/lib/format'
-import type { Building, Statement, UserDoc } from '@/types'
+import type { Building, Statement, UserDoc, Apartment } from '@/types'
 import { listUsersByBuildings } from '@/lib/repos/users'
 import { sendBulkMessage } from '@/lib/messaging'
+import { paymentCodeFor } from '@/lib/paymentCode'
 import {
   renderNotice,
   defaultNoticeEmailSubject,
@@ -27,6 +28,7 @@ function phoneOf(u: UserDoc): string {
 interface Recipient {
   user: UserDoc
   codes: string[]
+  refs: string[]
   totalDue: number
   phoneId: string
   byEmail: boolean
@@ -38,11 +40,13 @@ interface SendLine { id: string; ok: boolean; reason?: string; channel: 'email' 
 export function StatementNotifyModal({
   st,
   building,
+  apartments,
   open,
   onClose,
 }: {
   st: Statement
   building: Building
+  apartments: Apartment[]
   open: boolean
   onClose: () => void
 }) {
@@ -80,22 +84,25 @@ export function StatementNotifyModal({
 
   const recipients = useMemo<Recipient[]>(() => {
     const rowByApt = new Map(st.rows.map((r) => [r.apartmentId, r]))
+    const aptById = new Map(apartments.map((a) => [a.id, a]))
     const out: Recipient[] = []
     for (const u of users) {
-      const apts = (u.apartmentIds ?? []).map((id) => rowByApt.get(id)).filter(Boolean) as typeof st.rows
-      if (apts.length === 0) continue
+      const ids = (u.apartmentIds ?? []).filter((id) => rowByApt.has(id))
+      if (ids.length === 0) continue
+      const rows = ids.map((id) => rowByApt.get(id)!)
       const phoneId = phoneOf(u)
       out.push({
         user: u,
-        codes: apts.map((r) => r.code),
-        totalDue: apts.reduce((s, r) => s + r.total, 0),
+        codes: rows.map((r) => r.code),
+        refs: ids.map((id) => paymentCodeFor(aptById.get(id), st.buildingCode, rowByApt.get(id)!.code)),
+        totalDue: rows.reduce((s, r) => s + r.total, 0),
         phoneId,
         byEmail: isEmail(u.email),
         bySms: isPhone(phoneId),
       })
     }
     return out.sort((a, b) => (a.user.name || a.user.email).localeCompare(b.user.name || b.user.email, 'el'))
-  }, [users, st.rows])
+  }, [users, st.rows, st.buildingCode, apartments])
 
   useEffect(() => {
     if (!open) return
@@ -144,6 +151,7 @@ export function StatementNotifyModal({
     ...constVars,
     name: r.user.name || '',
     apts: r.codes.join(', '),
+    ref: r.refs.join(', '),
     amount: money(r.totalDue),
   })
 
@@ -333,9 +341,9 @@ export function StatementNotifyModal({
           )}
 
           <p className="text-xs text-gray-400">
-            Μεταβλητές: <code>{'{name}'}</code> <code>{'{apts}'}</code> <code>{'{amount}'}</code> <code>{'{period}'}</code>{' '}
-            <code>{'{due}'}</code> <code>{'{iban}'}</code> <code>{'{bank}'}</code> <code>{'{company}'}</code>{' '}
-            <code>{'{building}'}</code> <code>{'{link}'}</code>. Τα προεπιλεγμένα κείμενα ορίζονται στις «Ρυθμίσεις κτιρίου».
+            Μεταβλητές: <code>{'{name}'}</code> <code>{'{apts}'}</code> <code>{'{amount}'}</code> <code>{'{ref}'}</code>{' '}
+            <code>{'{period}'}</code> <code>{'{due}'}</code> <code>{'{iban}'}</code> <code>{'{bank}'}</code>{' '}
+            <code>{'{company}'}</code> <code>{'{building}'}</code> <code>{'{link}'}</code>. Τα προεπιλεγμένα κείμενα ορίζονται στις «Ρυθμίσεις κτιρίου».
           </p>
         </div>
       )}

@@ -12,6 +12,7 @@ import { createApartment, updateApartment, deleteApartment } from '@/lib/repos/a
 import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
 import { balancesByApartment } from '@/lib/balances'
+import { paymentCodeFor } from '@/lib/paymentCode'
 import { logAudit } from '@/lib/audit'
 
 type FormState = {
@@ -20,6 +21,7 @@ type FormState = {
   ownerName: string
   tenantName: string
   closed: boolean
+  paymentCode: string
   millesimes: Record<string, number>
 }
 
@@ -29,6 +31,7 @@ const emptyForm = (): FormState => ({
   ownerName: '',
   tenantName: '',
   closed: false,
+  paymentCode: '',
   millesimes: {},
 })
 
@@ -68,6 +71,7 @@ export default function Apartments() {
       ownerName: a.ownerName,
       tenantName: a.tenantName ?? '',
       closed: !!a.closed,
+      paymentCode: a.paymentCode ?? '',
       millesimes: { ...a.millesimes },
     })
     setModalOpen(true)
@@ -82,6 +86,7 @@ export default function Apartments() {
       ownerName: form.ownerName.trim(),
       tenantName: form.tenantName.trim() || undefined,
       closed: form.closed,
+      paymentCode: form.paymentCode.trim() || undefined,
       millesimes: form.millesimes,
     }
     if (editing) {
@@ -237,6 +242,22 @@ export default function Apartments() {
           />
           Κλειστό διαμέρισμα (επηρεάζει τον επιμερισμό θέρμανσης)
         </label>
+
+        <div className="mt-3">
+          <Field
+            label="Κωδικός αιτιολογίας πληρωμής (προαιρετικό)"
+            hint={`Για αναγνώριση στο extré της τράπεζας. Κενό = αυτόματα «${paymentCodeFor(
+              { paymentCode: '', orderNo: Number(form.orderNo) || 0 },
+              building?.code ?? '',
+            )}».`}
+          >
+            <TextField
+              value={form.paymentCode}
+              onChange={(e) => setForm({ ...form, paymentCode: e.target.value })}
+              placeholder={paymentCodeFor({ paymentCode: '', orderNo: Number(form.orderNo) || 0 }, building?.code ?? '')}
+            />
+          </Field>
+        </div>
 
         <div className="mt-4">
           <h3 className="mb-2 text-sm font-semibold text-gray-700">Χιλιοστά</h3>

@@ -10,6 +10,7 @@ export function NoticeDocument({
   iban,
   bankName,
   companyName,
+  paymentCode,
   dueDays = 30,
   area,
 }: {
@@ -20,6 +21,8 @@ export function NoticeDocument({
   bankName?: string
   /** Επωνυμία δικαιούχου (προαιρετικό — από τις ρυθμίσεις). */
   companyName?: string
+  /** Κωδικός αιτιολογίας πληρωμής του διαμερίσματος. */
+  paymentCode?: string
   /** Προθεσμία πληρωμής σε ημέρες μετά την έκδοση (προεπιλογή 30). */
   dueDays?: number
   /** Περιοχή κτιρίου (προαιρετικό — από τις ρυθμίσεις). */
@@ -176,6 +179,12 @@ export function NoticeDocument({
             )}
             <div className="mt-2 text-gray-500">IBAN</div>
             <div className="break-all font-mono">{iban}</div>
+            {paymentCode && (
+              <>
+                <div className="mt-2 text-gray-500">Αιτιολογία πληρωμής</div>
+                <div className="break-all font-mono font-semibold">{paymentCode}</div>
+              </>
+            )}
             {dueDate && (
               <div className="mt-2 font-semibold text-red-700">
                 Προθεσμία πληρωμής: {formatDate(dueDate)}

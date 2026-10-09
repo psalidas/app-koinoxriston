@@ -42,7 +42,7 @@ export function NoticeDocument({
   const cell = 'border border-gray-400 px-1 py-0.5'
 
   return (
-    <div className="text-[11px] text-gray-900">
+    <div className="text-[11px] leading-normal text-gray-900">
       {/* Κεφαλίδα */}
       <div className="flex border border-gray-400">
         <div className="flex-1 border-r border-gray-400 p-2 text-[10px] leading-tight">
@@ -112,12 +112,16 @@ export function NoticeDocument({
               <tr key={g} className="align-top" style={idx % 2 === 1 ? { backgroundColor: '#f1f3f5' } : undefined}>
                 <td className={`${cell} font-semibold`}>{GROUP_LABELS[g]}</td>
                 <td className={cell}>
-                  {lines.map((l, i) => (
-                    <div key={i} className="flex justify-between gap-2">
-                      <span className="truncate">{l.category}</span>
-                      <span className="tnum shrink-0">{amount(l.amount)}</span>
-                    </div>
-                  ))}
+                  <table className="w-full">
+                    <tbody>
+                      {lines.map((l, i) => (
+                        <tr key={i}>
+                          <td className="pr-2 align-top">{l.category}</td>
+                          <td className="tnum whitespace-nowrap text-right align-top">{amount(l.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </td>
                 <td className={`${cell} text-right tnum`}>{amount(st.totals.byGroup[g] ?? 0)}</td>
                 <td className={`${cell} text-right tnum`}>

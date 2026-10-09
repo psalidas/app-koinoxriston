@@ -10,7 +10,12 @@ type Orientation = 'portrait' | 'landscape'
  *  σελιδοποίηση A4. Χρησιμοποιεί html2canvas ώστε τα ελληνικά να αποδίδονται
  *  πάντα σωστά (raster της πραγματικής απόδοσης του browser). */
 export async function nodeToPdfBase64(node: HTMLElement, orientation: Orientation = 'portrait'): Promise<string> {
-  const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+  const canvas = await html2canvas(node, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    windowWidth: node.scrollWidth,
+  })
   const img = canvas.toDataURL('image/jpeg', 0.92)
   const pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' })
   const pageW = pdf.internal.pageSize.getWidth()
@@ -42,8 +47,9 @@ export async function elementToPdfBase64(
   const root = createRoot(host)
   try {
     flushSync(() => root.render(element))
-    // Μικρή αναμονή για fonts/εικόνες.
-    await new Promise((r) => setTimeout(r, 150))
+    // Αναμονή για fonts/εικόνες/layout πριν το html2canvas.
+    await (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready?.catch(() => {})
+    await new Promise((r) => setTimeout(r, 350))
     return await nodeToPdfBase64(host, orientation)
   } finally {
     root.unmount()

@@ -399,6 +399,7 @@ export default function StatementView() {
         <StatementNotifyModal
           st={st}
           building={building}
+          apartments={apartments}
           open={showNotify}
           onClose={() => setShowNotify(false)}
         />

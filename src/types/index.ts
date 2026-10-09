@@ -104,6 +104,9 @@ export interface Apartment {
   /** scaleKey -> χιλιοστά value */
   millesimes: Record<string, number>
   closed?: boolean
+  /** Σταθερός κωδικός αιτιολογίας πληρωμής (για αναγνώριση στο extré τράπεζας).
+   *  Αν κενό, παράγεται αυτόματα από κωδικό κτιρίου + Α/Α. */
+  paymentCode?: string
   createdAt?: Timestamp
 }
 

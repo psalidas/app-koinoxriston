@@ -6,11 +6,12 @@ import { Button } from '@/components/forms'
 import { NoticeDocument } from '@/components/NoticeDocument'
 import type { Statement } from '@/types'
 import { getStatement } from '@/lib/repos/statements'
+import { paymentCodeFor } from '@/lib/paymentCode'
 
 export default function AllNotices() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { building } = useAppData()
+  const { building, apartments } = useAppData()
   const [st, setSt] = useState<Statement | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -49,6 +50,11 @@ export default function AllNotices() {
               iban={iban}
               bankName={building?.bankName}
               companyName={building?.companyName}
+              paymentCode={paymentCodeFor(
+                apartments.find((a) => a.id === row.apartmentId),
+                st.buildingCode,
+                row.code,
+              )}
               dueDays={building?.paymentDueDays}
               area={building?.area}
             />

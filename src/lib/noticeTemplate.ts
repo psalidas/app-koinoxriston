@@ -1,9 +1,9 @@
 // Πρότυπα ειδοποίησης έκδοσης κοινοχρήστων (κοινά για ρυθμίσεις & modal).
-// Placeholders: {name} {apts} {amount} {period} {due} {iban} {bank}
+// Placeholders: {name} {apts} {amount} {ref} {period} {due} {iban} {bank}
 //               {company} {building} {link}
 
 export const NOTICE_PLACEHOLDERS = [
-  '{name}', '{apts}', '{amount}', '{period}', '{due}',
+  '{name}', '{apts}', '{amount}', '{ref}', '{period}', '{due}',
   '{iban}', '{bank}', '{company}', '{building}', '{link}',
 ]
 
@@ -23,6 +23,7 @@ export function defaultNoticeEmailTemplate(): string {
     'Δικαιούχος: {company}',
     'Τράπεζα: {bank}',
     'IBAN: {iban}',
+    'Αιτιολογία πληρωμής: {ref}',
     '',
     'Αναλυτικά παραστατικά στην πλατφόρμα: {link}',
     '',
@@ -31,7 +32,7 @@ export function defaultNoticeEmailTemplate(): string {
 }
 
 export function defaultNoticeSmsTemplate(): string {
-  return 'Έκδοση κοινοχρήστων {building}, περίοδος {period}: ποσό {amount} για διαμέρισμα {apts}, πληρωμή έως {due}. IBAN {iban}. Αναλυτικά παραστατικά: {link}'
+  return 'Έκδοση κοινοχρήστων {building}, περίοδος {period}: ποσό {amount} για διαμέρισμα {apts}, πληρωμή έως {due}. IBAN {iban}, αιτιολογία {ref}. Αναλυτικά: {link}'
 }
 
 /** Αντικαθιστά placeholders και καθαρίζει κενές γραμμές από κενές τιμές. */

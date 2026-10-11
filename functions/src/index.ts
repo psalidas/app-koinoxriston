@@ -31,6 +31,7 @@ export { redeemMagicLink } from './magic/redeem'
 // AI προσυμπλήρωση παραστατικού δαπάνης (Claude Haiku 4.5 vision).
 // env: ANTHROPIC_API_KEY (GitHub Secret → CI).
 export { ocrReceipt } from './expenses/ocrReceipt'
+export { ocrPayment } from './expenses/ocrPayment'
 
 import { loadInviteConfig } from './invites/send'
 

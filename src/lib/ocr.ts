@@ -70,3 +70,19 @@ export async function analyzeReceipt(file: File): Promise<OcrResult> {
   const fn = httpsCallable<{ imageBase64: string; mediaType: string }, OcrResult>(functions, 'ocrReceipt')
   return (await fn({ imageBase64: base64, mediaType })).data
 }
+
+export interface PaymentOcrResult {
+  amount?: number
+  date?: string
+  method?: 'cash' | 'bank' | 'card' | 'iris' | 'other'
+  reference?: string
+  payerName?: string
+}
+
+/** Ανάλυση απόδειξης πληρωμής με AI· προσυμπληρώνει τη φόρμα πληρωμής. */
+export async function analyzePayment(file: File): Promise<PaymentOcrResult> {
+  if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')
+  const { base64, mediaType } = await prepare(file)
+  const fn = httpsCallable<{ imageBase64: string; mediaType: string }, PaymentOcrResult>(functions, 'ocrPayment')
+  return (await fn({ imageBase64: base64, mediaType })).data
+}

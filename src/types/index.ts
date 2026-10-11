@@ -220,6 +220,10 @@ export interface Payment {
   date: Timestamp
   method: PaymentMethod
   note?: string
+  /** Συνημμένο αρχείο πληρωμής (απόδειξη/εντολή). */
+  receiptUrl?: string
+  receiptName?: string
+  receiptPath?: string
   createdAt?: Timestamp
   createdBy?: string
 }

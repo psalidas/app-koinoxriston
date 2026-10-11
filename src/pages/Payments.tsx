@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, Sparkles, Paperclip } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
@@ -10,9 +10,17 @@ import { money, formatDate, compareEl } from '@/lib/format'
 import type { Payment, PaymentMethod } from '@/types'
 import { PAYMENT_METHOD_LABELS } from '@/types'
 import { listPayments, createPayment, updatePayment, deletePayment } from '@/lib/repos/payments'
+import { analyzePayment } from '@/lib/ocr'
+import { uploadReceipt } from '@/lib/upload'
+import { paymentCodeFor } from '@/lib/paymentCode'
 import { logAudit } from '@/lib/audit'
 
 type SortKey = 'date' | 'apartment' | 'method' | 'note' | 'amount'
+
+/** Κανονικοποίηση για σύγκριση ονομάτων/κωδικών (κεφαλαία, χωρίς τόνους). */
+function norm(s?: string): string {
+  return (s ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -41,6 +49,55 @@ export default function Payments() {
     method: 'cash' as PaymentMethod,
     note: '',
   })
+  const [file, setFile] = useState<File | null>(null)
+  const [existingReceipt, setExistingReceipt] = useState<{ url: string; name: string } | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  /** Αντιστοιχίζει διαμέρισμα από αιτιολογία (κωδικός) ή όνομα καταθέτη. */
+  function matchApartment(reference?: string, payer?: string): string {
+    if (!building) return ''
+    const r = norm(reference)
+    const p = norm(payer)
+    // 1) Κωδικός αιτιολογίας μέσα στην αιτιολογία.
+    for (const a of apartments) {
+      const code = norm(paymentCodeFor(a, building.code))
+      if (code && (r.includes(code) || p.includes(code))) return a.id
+    }
+    // 2) Επώνυμο ιδιοκτήτη (token ≥4 χαρακτήρων) μέσα σε αιτιολογία/καταθέτη.
+    for (const a of apartments) {
+      const tokens = norm(a.ownerName).split(/[^A-ZΑ-Ω0-9]+/).filter((t) => t.length >= 4)
+      if (tokens.some((t) => p.includes(t) || r.includes(t))) return a.id
+    }
+    return ''
+  }
+
+  async function onPickFile(f: File) {
+    setFile(f)
+    setAiMsg(null)
+    setAnalyzing(true)
+    try {
+      const res = await analyzePayment(f)
+      const matchedId = matchApartment(res.reference, res.payerName)
+      setForm((prev) => ({
+        ...prev,
+        amount: res.amount != null ? res.amount : prev.amount,
+        date: res.date || prev.date,
+        method: res.method || prev.method,
+        note: [res.reference, res.payerName].filter(Boolean).join(' · ') || prev.note,
+        apartmentId: matchedId || prev.apartmentId,
+      }))
+      const parts: string[] = []
+      if (res.amount != null) parts.push(money(res.amount))
+      if (matchedId) parts.push(`διαμ. ${aptCode[matchedId] ?? ''}`)
+      setAiMsg(parts.length ? `Συμπληρώθηκε από AI: ${parts.join(', ')}. Ελέγξτε τα πεδία.` : 'Η AI δεν βρήκε στοιχεία — συμπληρώστε χειροκίνητα.')
+    } catch (e) {
+      setAiMsg('Αποτυχία ανάλυσης: ' + ((e as Error).message || 'άγνωστο'))
+    } finally {
+      setAnalyzing(false)
+    }
+  }
 
   async function load() {
     if (!building) return
@@ -66,6 +123,9 @@ export default function Payments() {
 
   function openNew() {
     setEditing(null)
+    setFile(null)
+    setExistingReceipt(null)
+    setAiMsg(null)
     setForm({
       apartmentId: apartments[0]?.id ?? '',
       amount: 0,
@@ -78,6 +138,9 @@ export default function Payments() {
 
   function openEdit(p: Payment) {
     setEditing(p)
+    setFile(null)
+    setAiMsg(null)
+    setExistingReceipt(p.receiptUrl ? { url: p.receiptUrl, name: p.receiptName ?? 'Αρχείο' } : null)
     setForm({
       apartmentId: p.apartmentId,
       amount: p.amount,
@@ -89,32 +152,45 @@ export default function Payments() {
   }
 
   async function save() {
-    if (!building || !form.apartmentId) return
-    const data = {
-      buildingId: building.id,
-      apartmentId: form.apartmentId,
-      amount: Number(form.amount) || 0,
-      date: Timestamp.fromDate(new Date(form.date)),
-      method: form.method,
-      note: form.note.trim() || undefined,
+    if (!building || !form.apartmentId || saving) return
+    setSaving(true)
+    try {
+      let receipt: { receiptUrl?: string; receiptName?: string; receiptPath?: string } = {}
+      if (file) {
+        const up = await uploadReceipt(file, building.id)
+        receipt = { receiptUrl: up.url, receiptName: up.name, receiptPath: up.path }
+      }
+      const data = {
+        buildingId: building.id,
+        apartmentId: form.apartmentId,
+        amount: Number(form.amount) || 0,
+        date: Timestamp.fromDate(new Date(form.date)),
+        method: form.method,
+        note: form.note.trim() || undefined,
+        ...receipt,
+      }
+      if (editing) {
+        await updatePayment(editing.id, data)
+      } else {
+        await createPayment(data)
+      }
+      await logAudit({
+        buildingId: building.id,
+        userEmail: user?.email ?? '',
+        userName: profile?.name ?? user?.email ?? '',
+        action: editing ? 'update' : 'create',
+        entity: 'payment',
+        entityId: editing?.id ?? form.apartmentId,
+        after: { amount: data.amount, apartment: aptCode[form.apartmentId] },
+      })
+      setModalOpen(false)
+      setEditing(null)
+      await load()
+    } catch (e) {
+      setAiMsg('Σφάλμα αποθήκευσης: ' + ((e as Error).message || 'άγνωστο'))
+    } finally {
+      setSaving(false)
     }
-    if (editing) {
-      await updatePayment(editing.id, data)
-    } else {
-      await createPayment(data)
-    }
-    await logAudit({
-      buildingId: building.id,
-      userEmail: user?.email ?? '',
-      userName: profile?.name ?? user?.email ?? '',
-      action: editing ? 'update' : 'create',
-      entity: 'payment',
-      entityId: editing?.id ?? form.apartmentId,
-      after: { amount: data.amount, apartment: aptCode[form.apartmentId] },
-    })
-    setModalOpen(false)
-    setEditing(null)
-    await load()
   }
 
   async function confirmDelete() {
@@ -232,7 +308,23 @@ export default function Payments() {
                 <td className="px-3 py-2">
                   <Badge>{PAYMENT_METHOD_LABELS[p.method]}</Badge>
                 </td>
-                <td className="px-3 py-2 text-gray-500">{p.note ?? ''}</td>
+                <td className="px-3 py-2 text-gray-500">
+                  <div className="flex items-center gap-1.5">
+                    {p.receiptUrl && (
+                      <a
+                        href={p.receiptUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 text-gray-400 hover:text-blue-600"
+                        title="Αρχείο πληρωμής"
+                      >
+                        <Paperclip size={14} />
+                      </a>
+                    )}
+                    <span>{p.note ?? ''}</span>
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-right tnum font-medium text-green-700">{money(p.amount)}</td>
                 <td className="px-3 py-2">
                   {isManager && (
@@ -266,14 +358,44 @@ export default function Payments() {
         title={editing ? 'Επεξεργασία πληρωμής' : 'Νέα πληρωμή'}
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setModalOpen(false); setEditing(null) }}>
+            <Button variant="secondary" onClick={() => { setModalOpen(false); setEditing(null) }} disabled={saving}>
               Ακύρωση
             </Button>
-            <Button onClick={save}>Αποθήκευση</Button>
+            <Button onClick={save} disabled={saving || analyzing}>{saving ? 'Αποθήκευση…' : 'Αποθήκευση'}</Button>
           </>
         }
       >
         <div className="space-y-3">
+          {/* AI συμπλήρωση από αρχείο πληρωμής */}
+          <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-700">
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPickFile(f) }}
+              />
+              <Sparkles size={16} />
+              {analyzing ? 'Ανάλυση αρχείου…' : 'Αρχείο πληρωμής — αυτόματη συμπλήρωση (AI)'}
+            </label>
+            {(file || existingReceipt) && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-gray-600">
+                <Paperclip size={13} />
+                {file ? (
+                  <span>{file.name}</span>
+                ) : (
+                  <a href={existingReceipt!.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    {existingReceipt!.name}
+                  </a>
+                )}
+              </div>
+            )}
+            {aiMsg && <div className="mt-1.5 text-xs text-gray-600">{aiMsg}</div>}
+            <p className="mt-1 text-[11px] text-gray-400">
+              Ανεβάστε απόδειξη/εντολή πληρωμής (PDF ή φωτογραφία). Η AI συμπληρώνει ποσό, ημερομηνία, τρόπο και προσπαθεί να εντοπίσει το διαμέρισμα από την αιτιολογία/όνομα.
+            </p>
+          </div>
+
           <Field label="Διαμέρισμα">
             <SelectField
               value={form.apartmentId}

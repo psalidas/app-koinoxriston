@@ -292,12 +292,20 @@ export interface Statement {
 
 // ── Announcements ────────────────────────────────────────────────────────────
 
+export interface AnnouncementAttachment {
+  url: string
+  name: string
+  path: string
+  contentType?: string
+}
+
 export interface Announcement {
   id: string
   buildingId: string
   title: string
   body: string
   pinned?: boolean
+  attachments?: AnnouncementAttachment[]
   authorName: string
   createdBy?: string
   createdAt?: Timestamp

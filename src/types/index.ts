@@ -437,6 +437,7 @@ export interface Poll {
   /** total eligible weight (denominator for quorum/percentages) */
   totalWeight: number
   assemblyId?: string
+  attachments?: AnnouncementAttachment[]
   results?: PollResults
   createdBy?: string
   createdAt?: Timestamp

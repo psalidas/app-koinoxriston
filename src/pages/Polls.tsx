@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Vote as VoteIcon, X, ChevronRight } from 'lucide-react'
+import { Plus, Vote as VoteIcon, X, ChevronRight, Upload } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { formatDate } from '@/lib/format'
-import type { Poll, PollEligibility, PollWeightMode } from '@/types'
+import type { Poll, PollEligibility, PollWeightMode, AnnouncementAttachment } from '@/types'
 import { POLL_WEIGHT_LABELS } from '@/types'
 import { listPolls, createPoll, totalEligibleWeight } from '@/lib/repos/polls'
+import { uploadDocument } from '@/lib/upload'
 
 export default function Polls() {
   const { building, apartments } = useAppData()
@@ -26,6 +27,8 @@ export default function Polls() {
     scaleKey: 'genika',
     deadline: '',
   })
+  const [newFiles, setNewFiles] = useState<File[]>([])
+  const [saving, setSaving] = useState(false)
 
   async function load() {
     if (!building) return
@@ -36,6 +39,20 @@ export default function Polls() {
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [building])
+
+  function openNew() {
+    setForm({
+      question: '',
+      description: '',
+      options: ['Ναι', 'Όχι'],
+      eligibility: 'owners',
+      weightMode: 'millesime',
+      scaleKey: 'genika',
+      deadline: '',
+    })
+    setNewFiles([])
+    setModalOpen(true)
+  }
 
   function setOption(i: number, v: string) {
     setForm((f) => ({ ...f, options: f.options.map((o, idx) => (idx === i ? v : o)) }))
@@ -48,27 +65,38 @@ export default function Polls() {
   }
 
   async function save() {
-    if (!building) return
+    if (!building || saving) return
     const options = form.options.map((o) => o.trim()).filter(Boolean)
     if (!form.question.trim() || options.length < 2) {
       alert('Χρειάζονται ερώτηση και τουλάχιστον 2 επιλογές.')
       return
     }
-    const totalWeight = totalEligibleWeight(apartments, form.weightMode, form.scaleKey)
-    await createPoll({
-      buildingId: building.id,
-      question: form.question.trim(),
-      description: form.description.trim() || undefined,
-      options,
-      eligibility: form.eligibility,
-      weightMode: form.weightMode,
-      scaleKey: form.weightMode === 'millesime' ? form.scaleKey : undefined,
-      deadline: form.deadline ? Timestamp.fromDate(new Date(form.deadline)) : undefined,
-      status: 'open',
-      totalWeight,
-    })
-    setModalOpen(false)
-    await load()
+    setSaving(true)
+    try {
+      const attachments: AnnouncementAttachment[] = []
+      for (const f of newFiles) {
+        const up = await uploadDocument(f, building.id)
+        attachments.push({ url: up.url, name: up.name, path: up.path, contentType: f.type || '' })
+      }
+      const totalWeight = totalEligibleWeight(apartments, form.weightMode, form.scaleKey)
+      await createPoll({
+        buildingId: building.id,
+        question: form.question.trim(),
+        description: form.description.trim() || undefined,
+        options,
+        eligibility: form.eligibility,
+        weightMode: form.weightMode,
+        scaleKey: form.weightMode === 'millesime' ? form.scaleKey : undefined,
+        deadline: form.deadline ? Timestamp.fromDate(new Date(form.deadline)) : undefined,
+        status: 'open',
+        totalWeight,
+        attachments: attachments.length ? attachments : undefined,
+      })
+      setModalOpen(false)
+      await load()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -78,7 +106,7 @@ export default function Polls() {
         subtitle="Ηλεκτρονικές ψηφοφορίες με βάρος κατά χιλιοστά"
         actions={
           isManager && (
-            <Button onClick={() => setModalOpen(true)}>
+            <Button onClick={openNew}>
               <Plus size={18} /> Νέα ψηφοφορία
             </Button>
           )
@@ -123,10 +151,10 @@ export default function Polls() {
         wide
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>
               Ακύρωση
             </Button>
-            <Button onClick={save}>Δημιουργία</Button>
+            <Button onClick={save} disabled={saving}>{saving ? 'Δημιουργία…' : 'Δημιουργία'}</Button>
           </>
         }
       >
@@ -194,6 +222,42 @@ export default function Polls() {
               <TextField type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
             </Field>
           </div>
+
+          <Field label="Επισυναπτόμενα (φωτογραφίες & έγγραφα)">
+            <div className="space-y-2">
+              {newFiles.length > 0 && (
+                <ul className="space-y-1">
+                  {newFiles.map((f, i) => (
+                    <li key={i} className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-2 py-1 text-sm">
+                      <Upload size={14} className="shrink-0 text-blue-400" />
+                      <span className="min-w-0 flex-1 truncate text-gray-700">{f.name}</span>
+                      <button
+                        onClick={() => setNewFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                        title="Αφαίρεση"
+                      >
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                  className="hidden"
+                  onChange={(e) => {
+                    const fs = Array.from(e.target.files ?? [])
+                    if (fs.length) setNewFiles((prev) => [...prev, ...fs])
+                    e.target.value = ''
+                  }}
+                />
+                <Plus size={16} /> Προσθήκη αρχείων
+              </label>
+            </div>
+          </Field>
         </div>
       </Modal>
     </div>

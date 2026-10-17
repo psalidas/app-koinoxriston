@@ -32,6 +32,7 @@ export { redeemMagicLink } from './magic/redeem'
 // env: ANTHROPIC_API_KEY (GitHub Secret → CI).
 export { ocrReceipt } from './expenses/ocrReceipt'
 export { ocrPayment } from './expenses/ocrPayment'
+export { submitVote } from './polls/submitVote'
 
 import { loadInviteConfig } from './invites/send'
 

@@ -11,6 +11,8 @@ import {
   where,
 } from 'firebase/firestore'
 import { col, clean, requireDb } from '../db'
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '../firebase'
 import type { Apartment, Poll, PollResults, PollWeightMode, Vote } from '@/types'
 
 export async function listPolls(buildingId: string): Promise<Poll[]> {
@@ -54,6 +56,22 @@ export async function castVote(data: Omit<Vote, 'id'>): Promise<void> {
     ...clean(data),
     createdAt: serverTimestamp(),
   })
+}
+
+/** Καταχώρηση ψήφου μέσω callable (server-side βάρος, IP/browser, email, audit). */
+export async function submitVote(pollId: string, option: number): Promise<void> {
+  if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')
+  const meta = {
+    platform: typeof navigator !== 'undefined' ? navigator.platform : '',
+    language: typeof navigator !== 'undefined' ? navigator.language : '',
+    timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return '' } })(),
+    screen: typeof window !== 'undefined' && window.screen ? `${window.screen.width}x${window.screen.height}` : '',
+  }
+  const fn = httpsCallable<{ pollId: string; option: number; meta: typeof meta }, { ok: true; weight: number }>(
+    functions,
+    'submitVote',
+  )
+  await fn({ pollId, option, meta })
 }
 
 export async function listVotes(pollId: string): Promise<Vote[]> {

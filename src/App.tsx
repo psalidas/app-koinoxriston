@@ -30,6 +30,7 @@ import Topics from './pages/Topics'
 import TopicView from './pages/TopicView'
 import Polls from './pages/Polls'
 import PollView from './pages/PollView'
+import PollMinutes from './pages/PollMinutes'
 import Assemblies from './pages/Assemblies'
 import AssemblyView from './pages/AssemblyView'
 import Documents from './pages/Documents'
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/topics/:id" element={<TopicView />} />
         <Route path="/polls" element={<Polls />} />
         <Route path="/polls/:id" element={<PollView />} />
+        <Route path="/polls/:id/minutes" element={<PollMinutes />} />
         <Route path="/assemblies" element={<Assemblies />} />
         <Route path="/assemblies/:id" element={<AssemblyView />} />
         <Route path="/documents" element={<Documents />} />

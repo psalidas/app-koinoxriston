@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Lock, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, Badge } from '@/components/forms'
@@ -128,6 +128,28 @@ export default function PollView() {
           <Badge color={open ? 'green' : 'gray'}>{open ? 'Ανοιχτή' : 'Κλειστή'}</Badge>
         </div>
         {poll.description && <p className="mt-1 text-sm text-gray-600">{poll.description}</p>}
+        {poll.attachments && poll.attachments.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {poll.attachments.map((f, i) =>
+              (f.contentType ?? '').startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(f.name) ? (
+                <a key={i} href={f.url} target="_blank" rel="noreferrer" title={f.name}>
+                  <img src={f.url} alt={f.name} className="h-20 w-20 rounded-md border border-gray-200 object-cover hover:opacity-90" />
+                </a>
+              ) : (
+                <a
+                  key={i}
+                  href={f.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:border-blue-300 hover:text-blue-700"
+                >
+                  <Paperclip size={13} className="shrink-0" />
+                  <span className="truncate">{f.name}</span>
+                </a>
+              ),
+            )}
+          </div>
+        )}
         <div className="mt-2 text-xs text-gray-400">
           {POLL_WEIGHT_LABELS[poll.weightMode]}
           {poll.deadline && ` · λήξη ${formatDate(poll.deadline)}`}

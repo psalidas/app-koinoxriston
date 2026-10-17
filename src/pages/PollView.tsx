@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { deleteField } from 'firebase/firestore'
-import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip, Pencil, Send } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip, Pencil, Send, FileText, Info } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, Badge } from '@/components/forms'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PollFormModal } from '@/components/PollFormModal'
-import { mille, formatDate } from '@/lib/format'
+import { mille, formatDate, formatDateTime } from '@/lib/format'
 import type { Poll, Vote } from '@/types'
 import { POLL_WEIGHT_LABELS } from '@/types'
 import {
@@ -15,13 +15,12 @@ import {
   updatePoll,
   deletePoll,
   getMyVote,
-  castVote,
+  submitVote as castVoteRemote,
   listVotes,
   deleteVote,
   voterWeight,
   tallyVotes,
 } from '@/lib/repos/polls'
-import { logAudit } from '@/lib/audit'
 
 export default function PollView() {
   const { id } = useParams()
@@ -35,6 +34,7 @@ export default function PollView() {
   const [editOpen, setEditOpen] = useState(false)
   const [votes, setVotes] = useState<Vote[]>([])
   const [voteToDelete, setVoteToDelete] = useState<Vote | null>(null)
+  const [expandedVote, setExpandedVote] = useState<string | null>(null)
 
   const voterId = user?.email ?? user?.phoneNumber ?? ''
   const myApartments = useMemo(
@@ -74,27 +74,13 @@ export default function PollView() {
     : { color: 'gray' as const, label: 'Κλειστή' }
 
   async function submitVote() {
-    if (!building || !poll || choice === null || !voterId) return
+    if (!poll || choice === null) return
     setBusy(true)
     try {
-      await castVote({
-        buildingId: building.id,
-        pollId: poll.id,
-        voterId,
-        voterName: profile?.name ?? voterId,
-        option: choice,
-        weight: myWeight,
-        apartmentIds: myApartments.map((a) => a.id),
-      })
-      await logAudit({
-        buildingId: building.id,
-        userEmail: voterId,
-        userName: profile?.name ?? voterId,
-        action: 'vote',
-        entity: 'poll',
-        entityId: poll.question,
-      })
+      await castVoteRemote(poll.id, choice)
       await load()
+    } catch (e) {
+      alert('Αποτυχία ψήφου: ' + ((e as Error).message || 'άγνωστο'))
     } finally {
       setBusy(false)
     }
@@ -283,6 +269,11 @@ export default function PollView() {
           <Button variant="secondary" onClick={() => setEditOpen(true)}>
             <Pencil size={18} /> Επεξεργασία
           </Button>
+          {poll.status === 'closed' && (
+            <Button variant="secondary" onClick={() => navigate(`/polls/${poll.id}/minutes`)}>
+              <FileText size={18} /> Πρακτικό
+            </Button>
+          )}
           {isDraft && (
             <Button onClick={publish} disabled={busy}>
               <Send size={18} /> Δημοσίευση
@@ -316,23 +307,45 @@ export default function PollView() {
               {[...votes]
                 .sort((a, b) => (a.voterName || a.voterId).localeCompare(b.voterName || b.voterId, 'el'))
                 .map((v) => (
-                  <li key={v.id} className="flex items-center gap-3 py-2 text-sm">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-gray-900">{v.voterName || v.voterId}</div>
-                      <div className="text-xs text-gray-500">
-                        {(v.apartmentIds ?? []).map((aid) => aptCode.get(aid) ?? aid).join(', ')}
-                        {' · '}
-                        <span className="text-gray-700">{poll.options[v.option] ?? '—'}</span>
-                        {poll.weightMode !== 'perUser' && ` · βάρος ${mille(v.weight)}`}
+                  <li key={v.id} className="py-2 text-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900">{v.voterName || v.voterId}</div>
+                        <div className="text-xs text-gray-500">
+                          {(v.apartmentIds ?? []).map((aid) => aptCode.get(aid) ?? aid).join(', ')}
+                          {' · '}
+                          <span className="text-gray-700">{poll.options[v.option] ?? '—'}</span>
+                          {poll.weightMode !== 'perUser' && ` · βάρος ${mille(v.weight)}`}
+                          {v.createdAt && ` · ${formatDateTime(v.createdAt)}`}
+                        </div>
                       </div>
+                      <button
+                        onClick={() => setExpandedVote(expandedVote === v.id ? null : v.id)}
+                        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+                        title="Λεπτομέρειες"
+                      >
+                        <Info size={16} />
+                      </button>
+                      <button
+                        onClick={() => setVoteToDelete(v)}
+                        className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                        title="Διαγραφή ψήφου (για επαναψήφιση)"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setVoteToDelete(v)}
-                      className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
-                      title="Διαγραφή ψήφου (για επαναψήφιση)"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {expandedVote === v.id && (
+                      <div className="mt-1 rounded-md bg-gray-50 p-2 text-xs text-gray-600">
+                        <div><span className="text-gray-400">Ημ/νία & ώρα:</span> {formatDateTime(v.createdAt)}</div>
+                        <div><span className="text-gray-400">Ταυτότητα:</span> {v.voterId}</div>
+                        {v.meta?.ip && <div><span className="text-gray-400">IP:</span> {v.meta.ip}</div>}
+                        {v.meta?.userAgent && <div className="break-words"><span className="text-gray-400">Browser:</span> {v.meta.userAgent}</div>}
+                        {v.meta?.platform && <div><span className="text-gray-400">Σύστημα:</span> {v.meta.platform}</div>}
+                        {v.meta?.timezone && <div><span className="text-gray-400">Ζώνη ώρας:</span> {v.meta.timezone}</div>}
+                        {v.meta?.screen && <div><span className="text-gray-400">Οθόνη:</span> {v.meta.screen}</div>}
+                        {!v.meta && <div className="text-gray-400">Χωρίς μεταδεδομένα (παλαιότερη ψήφος).</div>}
+                      </div>
+                    )}
                   </li>
                 ))}
             </ul>

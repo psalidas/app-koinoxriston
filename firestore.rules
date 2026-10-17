@@ -233,10 +233,9 @@ service cloud.firestore {
     }
     match /votes/{id} {
       allow read: if isManager() || (isAuthed() && resource.data.voterId == uid());
-      // Μία ψήφος ανά ψηφοφόρο — δεν επιτρέπεται αλλαγή (update). Ο διαχειριστής
-      // μπορεί να διαγράψει ώστε το διαμέρισμα να ξαναψηφίσει.
-      allow create: if isKnownUser() && request.resource.data.voterId == uid();
-      allow update: if false;
+      // Οι ψήφοι καταχωρούνται ΜΟΝΟ server-side (callable submitVote, Admin SDK)
+      // ώστε να υπολογίζεται αξιόπιστα το βάρος και να μην αλλάζει ψήφος.
+      allow create, update: if false;
       allow delete: if isManager();
     }
 

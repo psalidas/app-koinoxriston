@@ -443,6 +443,15 @@ export interface Poll {
   createdAt?: Timestamp
 }
 
+export interface VoteMeta {
+  ip?: string
+  userAgent?: string
+  platform?: string
+  language?: string
+  timezone?: string
+  screen?: string
+}
+
 export interface Vote {
   id: string // `${pollId}__${voterId}`
   buildingId: string
@@ -452,6 +461,7 @@ export interface Vote {
   option: number
   weight: number
   apartmentIds: string[]
+  meta?: VoteMeta
   createdAt?: Timestamp
 }
 

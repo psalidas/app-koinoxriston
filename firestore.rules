@@ -233,8 +233,10 @@ service cloud.firestore {
     }
     match /votes/{id} {
       allow read: if isManager() || (isAuthed() && resource.data.voterId == uid());
-      allow create, update: if isKnownUser()
-        && request.resource.data.voterId == uid();
+      // Μία ψήφος ανά ψηφοφόρο — δεν επιτρέπεται αλλαγή (update). Ο διαχειριστής
+      // μπορεί να διαγράψει ώστε το διαμέρισμα να ξαναψηφίσει.
+      allow create: if isKnownUser() && request.resource.data.voterId == uid();
+      allow update: if false;
       allow delete: if isManager();
     }
 

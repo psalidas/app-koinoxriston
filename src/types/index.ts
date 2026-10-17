@@ -433,7 +433,7 @@ export interface Poll {
   weightMode: PollWeightMode
   scaleKey?: string // when weightMode === 'millesime'
   deadline?: Timestamp
-  status: 'open' | 'closed'
+  status: 'draft' | 'open' | 'closed'
   /** total eligible weight (denominator for quorum/percentages) */
   totalWeight: number
   assemblyId?: string

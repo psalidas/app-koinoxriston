@@ -96,16 +96,31 @@ export const onAnnouncementCreated = onDocumentCreated('announcements/{id}', asy
   await enqueueMail(to, `Ανακοίνωση: ${ann.title}`, html, await outgoingCc())
 })
 
-/** New poll → notify eligible users that a vote has opened. */
+/** New poll → notify eligible users that a vote has opened (skip drafts). */
 export const onPollCreated = onDocumentCreated('polls/{id}', async (event) => {
   const poll = event.data?.data()
   if (!poll) return
+  if (poll.status === 'draft') return
   const users = await buildingUsers(poll.buildingId as string)
   const to = users.filter((u) => u.data.active !== false && isEmail(u.id)).map((u) => u.id)
   const html =
     `<h2>Νέα ψηφοφορία</h2><p>${escapeHtml(poll.question || '')}</p>` +
     `<p>Ψηφίστε στην εφαρμογή.</p>`
   await enqueueMail(to, `Ψηφοφορία: ${poll.question}`, html, await outgoingCc())
+})
+
+/** Draft poll published (draft → open) → notify eligible users. */
+export const onPollPublished = onDocumentUpdated('polls/{id}', async (event) => {
+  const before = event.data?.before.data()
+  const after = event.data?.after.data()
+  if (!after) return
+  if (before?.status !== 'draft' || after.status !== 'open') return
+  const users = await buildingUsers(after.buildingId as string)
+  const to = users.filter((u) => u.data.active !== false && isEmail(u.id)).map((u) => u.id)
+  const html =
+    `<h2>Νέα ψηφοφορία</h2><p>${escapeHtml(after.question || '')}</p>` +
+    `<p>Ψηφίστε στην εφαρμογή.</p>`
+  await enqueueMail(to, `Ψηφοφορία: ${after.question}`, html, await outgoingCc())
 })
 
 /** Statement issued (draft → issued) → email each owner/resident their amount. */

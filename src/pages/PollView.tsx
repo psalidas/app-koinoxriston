@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip, Pencil, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, Badge } from '@/components/forms'
+import { PollFormModal } from '@/components/PollFormModal'
 import { mille, formatDate } from '@/lib/format'
 import type { Poll, Vote } from '@/types'
 import { POLL_WEIGHT_LABELS } from '@/types'
@@ -28,6 +29,7 @@ export default function PollView() {
   const [myVote, setMyVote] = useState<Vote | null>(null)
   const [choice, setChoice] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const voterId = user?.email ?? user?.phoneNumber ?? ''
   const myApartments = useMemo(
@@ -56,6 +58,12 @@ export default function PollView() {
   const myWeight = voterWeight(myApartments, poll.weightMode, poll.scaleKey)
   const eligible = myApartments.length > 0 && myWeight > 0
   const open = poll.status === 'open'
+  const isDraft = poll.status === 'draft'
+  const statusBadge = open
+    ? { color: 'green' as const, label: 'Ανοιχτή' }
+    : isDraft
+    ? { color: 'amber' as const, label: 'Πρόχειρη' }
+    : { color: 'gray' as const, label: 'Κλειστή' }
 
   async function submitVote() {
     if (!building || !poll || choice === null || !voterId) return
@@ -103,6 +111,12 @@ export default function PollView() {
     await load()
   }
 
+  async function publish() {
+    if (!poll) return
+    await updatePoll(poll.id, { status: 'open' })
+    await load()
+  }
+
   async function remove() {
     if (!poll) return
     await deletePoll(poll.id)
@@ -125,7 +139,7 @@ export default function PollView() {
       <Card>
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-lg font-semibold text-gray-900">{poll.question}</h1>
-          <Badge color={open ? 'green' : 'gray'}>{open ? 'Ανοιχτή' : 'Κλειστή'}</Badge>
+          <Badge color={statusBadge.color}>{statusBadge.label}</Badge>
         </div>
         {poll.description && <p className="mt-1 text-sm text-gray-600">{poll.description}</p>}
         {poll.attachments && poll.attachments.length > 0 && (
@@ -159,7 +173,11 @@ export default function PollView() {
 
       {/* Voting / results */}
       <Card className="mt-4">
-        {results ? (
+        {isDraft ? (
+          <p className="py-3 text-center text-sm text-amber-700">
+            Πρόχειρη ψηφοφορία (δοκιμή) — δεν έχει δημοσιευτεί ακόμη, δεν επιτρέπεται ψήφος.
+          </p>
+        ) : results ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold text-gray-700">Αποτελέσματα</span>
@@ -231,12 +249,21 @@ export default function PollView() {
       </Card>
 
       {isManager && (
-        <div className="mt-4 flex justify-end gap-2">
-          {open ? (
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={() => setEditOpen(true)}>
+            <Pencil size={18} /> Επεξεργασία
+          </Button>
+          {isDraft && (
+            <Button onClick={publish} disabled={busy}>
+              <Send size={18} /> Δημοσίευση
+            </Button>
+          )}
+          {open && (
             <Button onClick={closeAndPublish} disabled={busy}>
               <Lock size={18} /> Κλείσιμο & δημοσίευση
             </Button>
-          ) : (
+          )}
+          {poll.status === 'closed' && (
             <Button variant="secondary" onClick={reopen}>
               Επαναφορά σε ανοιχτή
             </Button>
@@ -245,6 +272,17 @@ export default function PollView() {
             <Trash2 size={18} /> Διαγραφή
           </Button>
         </div>
+      )}
+
+      {building && (
+        <PollFormModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          building={building}
+          apartments={apartments}
+          poll={poll}
+          onSaved={load}
+        />
       )}
     </div>
   )

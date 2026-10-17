@@ -141,7 +141,12 @@ export function PollFormModal({
           <TextField value={question} onChange={(e) => setQuestion(e.target.value)} />
         </Field>
         <Field label="Περιγραφή (προαιρετικό)">
-          <TextField value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
         </Field>
 
         <div>

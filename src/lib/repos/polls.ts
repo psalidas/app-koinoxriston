@@ -61,6 +61,11 @@ export async function listVotes(pollId: string): Promise<Vote[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Vote, 'id'>) }))
 }
 
+/** Διαγραφή ψήφου (διαχειριστής) — επιτρέπει στο διαμέρισμα να ξαναψηφίσει. */
+export async function deleteVote(pollId: string, voterId: string): Promise<void> {
+  await deleteDoc(doc(requireDb(), 'votes', voteId(pollId, voterId)))
+}
+
 // ── Weight helpers ──
 /** Compute a voter's weight for a poll from their apartments. */
 export function voterWeight(

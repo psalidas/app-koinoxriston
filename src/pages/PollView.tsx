@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip, Pencil, Send } from '
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, Badge } from '@/components/forms'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PollFormModal } from '@/components/PollFormModal'
 import { mille, formatDate } from '@/lib/format'
 import type { Poll, Vote } from '@/types'
@@ -16,6 +17,7 @@ import {
   getMyVote,
   castVote,
   listVotes,
+  deleteVote,
   voterWeight,
   tallyVotes,
 } from '@/lib/repos/polls'
@@ -31,6 +33,8 @@ export default function PollView() {
   const [choice, setChoice] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [votes, setVotes] = useState<Vote[]>([])
+  const [voteToDelete, setVoteToDelete] = useState<Vote | null>(null)
 
   const voterId = user?.email ?? user?.phoneNumber ?? ''
   const myApartments = useMemo(
@@ -46,6 +50,9 @@ export default function PollView() {
       const v = await getMyVote(id, voterId)
       setMyVote(v)
       if (v) setChoice(v.option)
+    }
+    if (isManager) {
+      setVotes(await listVotes(id))
     }
   }
 
@@ -124,6 +131,16 @@ export default function PollView() {
     await deletePoll(poll.id)
     navigate('/polls')
   }
+
+  async function confirmDeleteVote() {
+    if (!poll || !voteToDelete) return
+    await deleteVote(poll.id, voteToDelete.voterId)
+    setVoteToDelete(null)
+    await load()
+  }
+
+  // Κωδικοί διαμερισμάτων ανά id (για τη λίστα ψήφων).
+  const aptCode = new Map(apartments.map((a) => [a.id, a.code]))
 
   const results = poll.results
   const denom = poll.totalWeight || results?.votedWeight || 1
@@ -211,38 +228,49 @@ export default function PollView() {
             </p>
           </div>
         ) : eligible ? (
-          <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-700">
-              Η ψήφος σας {poll.weightMode !== 'perUser' && `(βάρος ${mille(myWeight)})`}
-            </div>
-            {poll.options.map((opt, i) => (
-              <label
-                key={i}
-                className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                  choice === i ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                } ${!open ? 'opacity-60' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name="vote"
-                  disabled={!open}
-                  checked={choice === i}
-                  onChange={() => setChoice(i)}
-                />
-                {opt}
-              </label>
-            ))}
-            {open && (
-              <Button onClick={submitVote} disabled={busy || choice === null} className="mt-2 w-full">
-                <CheckCircle2 size={18} /> {myVote ? 'Αλλαγή ψήφου' : 'Υποβολή ψήφου'}
-              </Button>
-            )}
-            {myVote && (
-              <p className="text-center text-xs text-green-600">
-                Έχετε ψηφίσει: {poll.options[myVote.option]}
+          myVote ? (
+            <div className="space-y-1 text-sm">
+              <div className="font-medium text-gray-700">Η ψήφος σας</div>
+              <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2">
+                <CheckCircle2 size={18} className="text-green-600" />
+                <span className="text-gray-800">{poll.options[myVote.option]}</span>
+              </div>
+              <p className="text-xs text-gray-400">
+                Η ψήφος είναι οριστική και δεν αλλάζει. Αν χρειάζεται διόρθωση, ζητήστε από τον
+                διαχειριστή να τη διαγράψει για να ξαναψηφίσετε.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-700">
+                Η ψήφος σας {poll.weightMode !== 'perUser' && `(βάρος ${mille(myWeight)})`}
+              </div>
+              {poll.options.map((opt, i) => (
+                <label
+                  key={i}
+                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                    choice === i ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  } ${!open ? 'opacity-60' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="vote"
+                    disabled={!open}
+                    checked={choice === i}
+                    onChange={() => setChoice(i)}
+                  />
+                  {opt}
+                </label>
+              ))}
+              {open ? (
+                <Button onClick={submitVote} disabled={busy || choice === null} className="mt-2 w-full">
+                  <CheckCircle2 size={18} /> Υποβολή ψήφου
+                </Button>
+              ) : (
+                <p className="text-center text-xs text-gray-400">Η ψηφοφορία δεν είναι ανοιχτή.</p>
+              )}
+            </div>
+          )
         ) : (
           <p className="py-2 text-center text-sm text-gray-500">
             Δεν έχετε δικαίωμα ψήφου σε αυτή την ψηφοφορία (δεν υπάρχει συνδεδεμένο διαμέρισμα).
@@ -276,6 +304,42 @@ export default function PollView() {
         </div>
       )}
 
+      {isManager && (
+        <Card className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">
+            Ψήφοι ({votes.length})
+          </h2>
+          {votes.length === 0 ? (
+            <p className="py-2 text-center text-sm text-gray-400">Κανείς δεν έχει ψηφίσει ακόμη.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {[...votes]
+                .sort((a, b) => (a.voterName || a.voterId).localeCompare(b.voterName || b.voterId, 'el'))
+                .map((v) => (
+                  <li key={v.id} className="flex items-center gap-3 py-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900">{v.voterName || v.voterId}</div>
+                      <div className="text-xs text-gray-500">
+                        {(v.apartmentIds ?? []).map((aid) => aptCode.get(aid) ?? aid).join(', ')}
+                        {' · '}
+                        <span className="text-gray-700">{poll.options[v.option] ?? '—'}</span>
+                        {poll.weightMode !== 'perUser' && ` · βάρος ${mille(v.weight)}`}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setVoteToDelete(v)}
+                      className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                      title="Διαγραφή ψήφου (για επαναψήφιση)"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </Card>
+      )}
+
       {building && (
         <PollFormModal
           open={editOpen}
@@ -286,6 +350,13 @@ export default function PollView() {
           onSaved={load}
         />
       )}
+
+      <ConfirmDialog
+        open={!!voteToDelete}
+        message={`Διαγραφή της ψήφου «${voteToDelete?.voterName || voteToDelete?.voterId}»; Το διαμέρισμα θα μπορεί να ξαναψηφίσει.`}
+        onCancel={() => setVoteToDelete(null)}
+        onConfirm={confirmDeleteVote}
+      />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { deleteField } from 'firebase/firestore'
 import { ArrowLeft, CheckCircle2, Lock, Trash2, Paperclip, Pencil, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
@@ -107,7 +108,8 @@ export default function PollView() {
 
   async function reopen() {
     if (!poll) return
-    await updatePoll(poll.id, { status: 'open' })
+    // Καθάρισε τα παλιά αποτελέσματα ώστε να ξαναγίνει ορατή η ψήφος.
+    await updatePoll(poll.id, { status: 'open', results: deleteField() as unknown as undefined })
     await load()
   }
 
@@ -177,7 +179,7 @@ export default function PollView() {
           <p className="py-3 text-center text-sm text-amber-700">
             Πρόχειρη ψηφοφορία (δοκιμή) — δεν έχει δημοσιευτεί ακόμη, δεν επιτρέπεται ψήφος.
           </p>
-        ) : results ? (
+        ) : poll.status === 'closed' && results ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold text-gray-700">Αποτελέσματα</span>

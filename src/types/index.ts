@@ -565,6 +565,8 @@ export interface WorkTask {
   startDate?: Timestamp
   endDate?: Timestamp
   attachments?: { url: string; name: string; path: string }[] // προσφορές / αρχεία
+  /** Σύνδεση με υπάρχουσα δαπάνη/τιμολόγιο. */
+  expenseId?: string
   createdBy?: string
   createdByName?: string
   createdAt?: Timestamp

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Paperclip, Upload, Hammer } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Paperclip, Upload, Hammer, Receipt } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
@@ -8,11 +8,16 @@ import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { UploadProgress } from '@/components/UploadProgress'
 import { money, formatDate } from '@/lib/format'
-import type { WorkTask, WorkStatus } from '@/types'
+import type { WorkTask, WorkStatus, Expense } from '@/types'
 import { WORK_STATUS_LABELS, WORK_STATUS_ORDER, WORK_CATEGORIES } from '@/types'
 import { listWorks, createWork, updateWork, deleteWork } from '@/lib/repos/works'
+import { listExpenses } from '@/lib/repos/expenses'
 import { uploadDocument, deleteFile } from '@/lib/upload'
 import { logAudit } from '@/lib/audit'
+
+function isImageAtt(name: string): boolean {
+  return /\.(png|jpe?g|gif|webp|heic)$/i.test(name)
+}
 
 function toISO(ts?: Timestamp): string {
   const ms = ts?.toMillis?.()
@@ -34,6 +39,7 @@ const blankForm = () => ({
   cost: 0,
   startDate: '',
   endDate: '',
+  expenseId: '',
 })
 
 export default function Works() {
@@ -48,12 +54,15 @@ export default function Works() {
   const [file, setFile] = useState<File | null>(null)
   const [uploadPct, setUploadPct] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [expenses, setExpenses] = useState<Expense[]>([])
 
   async function load() {
     if (!building) return
     setLoading(true)
     try {
-      setItems(await listWorks(building.id))
+      const [w, ex] = await Promise.all([listWorks(building.id), listExpenses(building.id)])
+      setItems(w)
+      setExpenses(ex)
     } finally {
       setLoading(false)
     }
@@ -63,6 +72,11 @@ export default function Works() {
     void load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [building])
+
+  const linkedExpense = useMemo(
+    () => expenses.find((e) => e.id === form.expenseId) ?? null,
+    [expenses, form.expenseId],
+  )
 
   function openNew() {
     setEditing(null)
@@ -82,6 +96,7 @@ export default function Works() {
       cost: w.cost ?? 0,
       startDate: toISO(w.startDate),
       endDate: toISO(w.endDate),
+      expenseId: w.expenseId ?? '',
     })
     setFile(null)
     setModalOpen(true)
@@ -101,6 +116,7 @@ export default function Works() {
         cost: Number(form.cost) || undefined,
         startDate: form.startDate ? Timestamp.fromDate(new Date(form.startDate)) : undefined,
         endDate: form.endDate ? Timestamp.fromDate(new Date(form.endDate)) : undefined,
+        expenseId: form.expenseId || undefined,
       }
       if (editing) {
         await updateWork(editing.id, data)
@@ -224,6 +240,11 @@ export default function Works() {
                             <Paperclip size={12} /> {w.attachments!.length}
                           </span>
                         )}
+                        {w.expenseId && (
+                          <span className="inline-flex items-center gap-0.5 text-gray-500" title="Συνδεδεμένη δαπάνη">
+                            <Receipt size={12} /> δαπάνη
+                          </span>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -338,6 +359,34 @@ export default function Works() {
             </Field>
           </div>
 
+          <Field label="Σύνδεση με δαπάνη / τιμολόγιο (προαιρετικό)">
+            <SelectField
+              value={form.expenseId}
+              disabled={!isManager}
+              onChange={(e) => setForm({ ...form, expenseId: e.target.value })}
+            >
+              <option value="">— Καμία —</option>
+              {expenses.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  {[ex.code, ex.period, ex.category, money(ex.amount)].filter(Boolean).join(' · ')}
+                </option>
+              ))}
+            </SelectField>
+          </Field>
+          {linkedExpense && (
+            <div className="-mt-1 flex items-center gap-2 rounded-md bg-gray-50 p-2 text-xs text-gray-600">
+              <Receipt size={14} className="shrink-0 text-gray-400" />
+              <span className="min-w-0 flex-1 truncate">
+                {[linkedExpense.code, linkedExpense.category].filter(Boolean).join(' · ')} — {money(linkedExpense.amount)}
+              </span>
+              {linkedExpense.receiptUrl && (
+                <a href={linkedExpense.receiptUrl} target="_blank" rel="noreferrer" className="shrink-0 text-blue-600 hover:underline">
+                  Παραστατικό
+                </a>
+              )}
+            </div>
+          )}
+
           {/* Attachments — only for saved tasks */}
           {editing ? (
             <div className="border-t border-gray-100 pt-3">
@@ -348,20 +397,25 @@ export default function Works() {
               <ul className="space-y-1">
                 {(editing.attachments ?? []).map((f) => (
                   <li key={f.path} className="flex items-center gap-2">
+                    {isImageAtt(f.name) ? (
+                      <a href={f.url} target="_blank" rel="noreferrer" title={f.name} className="shrink-0">
+                        <img src={f.url} alt={f.name} className="h-14 w-14 rounded-md border border-gray-200 object-cover hover:opacity-90" />
+                      </a>
+                    ) : null}
                     <a
                       href={f.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+                      className="inline-flex min-w-0 flex-1 items-center gap-1.5 truncate text-sm text-blue-600 hover:underline"
                     >
-                      <Paperclip size={14} /> {f.name}
+                      <Paperclip size={14} className="shrink-0" /> <span className="truncate">{f.name}</span>
                     </a>
                     {isManager && (
                       <button
                         onClick={() => removeAttachment(f.path)}
                         disabled={busy}
                         title="Διαγραφή"
-                        className="rounded p-0.5 text-gray-300 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
+                        className="shrink-0 rounded p-0.5 text-gray-300 hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -375,6 +429,7 @@ export default function Works() {
                     <input
                       key={editing.attachments?.length ?? 0}
                       type="file"
+                      accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
                       onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                       className="block flex-1 text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
                     />

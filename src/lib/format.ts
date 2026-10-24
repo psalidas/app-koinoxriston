@@ -112,3 +112,23 @@ export function currentPeriod(): string {
   const m = parts.find((p) => p.type === 'month')?.value ?? '01'
   return `${y}-${m}`
 }
+
+/**
+ * Μετατροπή ελληνικών σε λατινικά + πεζά, για σύγκριση ανεξάρτητα από script
+ * (π.χ. αντιστοίχιση ονομάτων extré «ATHANASOPOULOS» με «ΑΘΑΝΑΣΟΠΟΥΛΟΣ»).
+ */
+export function latinize(input: string): string {
+  const map: Record<string, string> = {
+    α: 'a', ά: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', έ: 'e', ζ: 'z', η: 'i', ή: 'i',
+    θ: 'th', ι: 'i', ί: 'i', ϊ: 'i', ΐ: 'i', κ: 'k', λ: 'l', μ: 'm', ν: 'n', ξ: 'x',
+    ο: 'o', ό: 'o', π: 'p', ρ: 'r', σ: 's', ς: 's', τ: 't', υ: 'y', ύ: 'y', ϋ: 'y', ΰ: 'y',
+    φ: 'f', χ: 'ch', ψ: 'ps', ω: 'o', ώ: 'o',
+  }
+  return (input || '')
+    .toLowerCase()
+    .split('')
+    .map((c) => map[c] ?? c)
+    .join('')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+}

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, Sparkles, Paperclip } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, Sparkles, Paperclip, Upload } from 'lucide-react'
 import { Timestamp } from 'firebase/firestore'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField, NumberField, SelectField, Badge } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { BankImportModal } from '@/components/BankImportModal'
 import { money, formatDate, compareEl } from '@/lib/format'
 import type { Payment, PaymentMethod } from '@/types'
 import { PAYMENT_METHOD_LABELS } from '@/types'
@@ -54,6 +55,7 @@ export default function Payments() {
   const [analyzing, setAnalyzing] = useState(false)
   const [aiMsg, setAiMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   /** Αντιστοιχίζει διαμέρισμα από αιτιολογία (κωδικός) ή όνομα καταθέτη. */
   function matchApartment(reference?: string, payer?: string): string {
@@ -259,9 +261,14 @@ export default function Payments() {
         }
         actions={
           isManager && (
-            <Button onClick={openNew}>
-              <Plus size={18} /> Νέα πληρωμή
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setImportOpen(true)}>
+                <Upload size={18} /> Εισαγωγή extré
+              </Button>
+              <Button onClick={openNew}>
+                <Plus size={18} /> Νέα πληρωμή
+              </Button>
+            </div>
           )
         }
       />
@@ -444,6 +451,17 @@ export default function Payments() {
         onCancel={() => setToDelete(null)}
         onConfirm={confirmDelete}
       />
+
+      {building && (
+        <BankImportModal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          building={building}
+          apartments={apartments}
+          existing={payments}
+          onImported={load}
+        />
+      )}
     </div>
   )
 }

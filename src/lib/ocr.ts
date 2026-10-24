@@ -86,3 +86,20 @@ export async function analyzePayment(file: File): Promise<PaymentOcrResult> {
   const fn = httpsCallable<{ imageBase64: string; mediaType: string }, PaymentOcrResult>(functions, 'ocrPayment')
   return (await fn({ imageBase64: base64, mediaType })).data
 }
+
+export interface BankTxn {
+  date?: string
+  description?: string
+  amount?: number
+}
+
+/** Ανάλυση αντιγράφου κινήσεων (extré) με AI· επιστρέφει λίστα κινήσεων. */
+export async function analyzeBankStatement(file: File): Promise<BankTxn[]> {
+  if (!functions) throw new Error('Το Firebase δεν έχει ρυθμιστεί.')
+  const { base64, mediaType } = await prepare(file)
+  const fn = httpsCallable<{ imageBase64: string; mediaType: string }, { transactions: BankTxn[] }>(
+    functions,
+    'ocrBankStatement',
+  )
+  return (await fn({ imageBase64: base64, mediaType })).data.transactions ?? []
+}

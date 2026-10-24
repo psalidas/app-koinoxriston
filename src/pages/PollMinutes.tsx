@@ -51,6 +51,16 @@ export default function PollMinutes() {
     const tb = b.createdAt?.toMillis?.() ?? 0
     return ta - tb
   })
+  // Μη ψηφίσαντες (διαμερίσματα με δικαίωμα που δεν έχουν ψηφίσει).
+  const votedApt = new Set(votes.flatMap((v) => v.apartmentIds ?? []))
+  const scaleKey = poll.scaleKey || 'genika'
+  const eligibleApts = apartments.filter((a) =>
+    poll.weightMode === 'millesime' ? (a.millesimes[scaleKey] ?? 0) > 0 : true,
+  )
+  const notVoted = eligibleApts
+    .filter((a) => !votedApt.has(a.id))
+    .sort((a, b) => a.orderNo - b.orderNo)
+  const remainingW = Math.max(0, (poll.totalWeight || 0) - results.votedWeight)
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -113,6 +123,7 @@ export default function PollMinutes() {
         </table>
         <div className="mt-2 text-xs text-gray-600">
           Ψήφισαν: {results.votersCount} · Συμμετοχή: {participation}% του δικαιώματος ({mille(results.votedWeight)}/{mille(poll.totalWeight)})
+          {' · '}Δεν ψήφισαν: {notVoted.length} {notVoted.length === 1 ? 'διαμέρισμα' : 'διαμερίσματα'} ({mille(remainingW)} χιλ.)
         </div>
         <div className="mt-1 text-sm">
           <span className="text-gray-500">Απόφαση:</span>{' '}
@@ -124,6 +135,23 @@ export default function PollMinutes() {
               : `Ισοψηφία (${winners.map((x) => x.o).join(', ')})`}
           </b>
         </div>
+
+        {/* Μη ψηφίσαντες */}
+        {notVoted.length > 0 && (
+          <>
+            <h2 className="mb-2 mt-5 border-b border-gray-200 pb-1 text-sm font-bold">
+              Δεν ψήφισαν ({notVoted.length})
+            </h2>
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {notVoted.map((a) => (
+                <span key={a.id} className="rounded-md bg-gray-100 px-2 py-0.5 text-gray-700">
+                  {a.code}{a.ownerName ? ` — ${a.ownerName}` : ''}
+                  {poll.weightMode === 'millesime' ? ` (${mille(a.millesimes[scaleKey] ?? 0)})` : ''}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Αναλυτικές ψήφοι */}
         <h2 className="mb-2 mt-5 border-b border-gray-200 pb-1 text-sm font-bold">Αναλυτικά ψηφισάντων</h2>

@@ -35,12 +35,41 @@ export default function PollView() {
   const [votes, setVotes] = useState<Vote[]>([])
   const [voteToDelete, setVoteToDelete] = useState<Vote | null>(null)
   const [expandedVote, setExpandedVote] = useState<string | null>(null)
+  const [showNotVoted, setShowNotVoted] = useState(false)
 
   const voterId = user?.email ?? user?.phoneNumber ?? ''
   const myApartments = useMemo(
     () => apartments.filter((a) => (profile?.apartmentIds ?? []).includes(a.id)),
     [apartments, profile],
   )
+
+  // Ζωντανή σύνοψη για τον διαχειριστή (χιλιοστά & ποσοστά ανά επιλογή + μη ψηφίσαντες).
+  const tally = useMemo(() => {
+    if (!poll) return null
+    const totalW = poll.totalWeight || 0
+    const byOption = poll.options.map((_, i) => {
+      const vs = votes.filter((v) => v.option === i)
+      const w = vs.reduce((s, v) => s + v.weight, 0)
+      return { weight: w, count: vs.length, pct: totalW ? Math.round((w / totalW) * 100) : 0 }
+    })
+    const votedW = votes.reduce((s, v) => s + v.weight, 0)
+    const votedApt = new Set(votes.flatMap((v) => v.apartmentIds ?? []))
+    const scaleKey = poll.scaleKey || 'genika'
+    const eligibleApts = apartments.filter((a) =>
+      poll.weightMode === 'millesime' ? (a.millesimes[scaleKey] ?? 0) > 0 : true,
+    )
+    const notVoted = eligibleApts.filter((a) => !votedApt.has(a.id))
+    return {
+      totalW,
+      byOption,
+      votedW,
+      remainingW: Math.max(0, totalW - votedW),
+      votedCount: votes.length,
+      eligibleCount: eligibleApts.length,
+      notVoted,
+      pct: totalW ? Math.round((votedW / totalW) * 100) : 0,
+    }
+  }, [poll, votes, apartments])
 
   async function load() {
     if (!id) return
@@ -293,6 +322,67 @@ export default function PollView() {
             <Trash2 size={18} /> Διαγραφή
           </Button>
         </div>
+      )}
+
+      {isManager && tally && (
+        <Card className="mt-4">
+          <h2 className="mb-2 text-sm font-semibold text-gray-700">Σύνοψη (ζωντανά)</h2>
+          <div className="space-y-2">
+            {poll.options.map((opt, i) => {
+              const t = tally.byOption[i]
+              return (
+                <div key={i}>
+                  <div className="mb-0.5 flex items-center justify-between text-sm">
+                    <span className="text-gray-800">{opt}</span>
+                    <span className="tnum text-gray-500">
+                      {mille(t.weight)} χιλ. ({t.pct}%) · {t.count} {t.count === 1 ? 'ψήφος' : 'ψήφοι'}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-full rounded-full bg-blue-400" style={{ width: `${t.pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+            <div className="rounded-md bg-gray-50 p-2">
+              <div className="text-gray-500">Σύνολο δικαιώματος</div>
+              <div className="tnum font-semibold">{mille(tally.totalW)} χιλ.</div>
+            </div>
+            <div className="rounded-md bg-gray-50 p-2">
+              <div className="text-gray-500">Ψήφισαν</div>
+              <div className="tnum font-semibold">{mille(tally.votedW)} χιλ. ({tally.pct}%)</div>
+              <div className="text-gray-400">{tally.votedCount} ψηφοφόροι</div>
+            </div>
+            <div className="rounded-md bg-gray-50 p-2">
+              <div className="text-gray-500">Δεν ψήφισαν</div>
+              <div className="tnum font-semibold">{mille(tally.remainingW)} χιλ.</div>
+              <div className="text-gray-400">{tally.notVoted.length} διαμερίσματα</div>
+            </div>
+          </div>
+          {tally.notVoted.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setShowNotVoted((v) => !v)}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                {showNotVoted ? 'Απόκρυψη' : 'Εμφάνιση'} όσων δεν έχουν ψηφίσει ({tally.notVoted.length})
+              </button>
+              {showNotVoted && (
+                <ul className="mt-1 flex flex-wrap gap-1.5">
+                  {[...tally.notVoted]
+                    .sort((a, b) => a.orderNo - b.orderNo)
+                    .map((a) => (
+                      <li key={a.id} className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                        {a.code}{a.ownerName ? ` — ${a.ownerName}` : ''}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </Card>
       )}
 
       {isManager && (

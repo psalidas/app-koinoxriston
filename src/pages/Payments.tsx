@@ -11,6 +11,8 @@ import { money, formatDate, compareEl } from '@/lib/format'
 import type { Payment, PaymentMethod } from '@/types'
 import { PAYMENT_METHOD_LABELS } from '@/types'
 import { listPayments, createPayment, updatePayment, deletePayment } from '@/lib/repos/payments'
+import { listStatements } from '@/lib/repos/statements'
+import { balancesByApartment } from '@/lib/balances'
 import { analyzePayment } from '@/lib/ocr'
 import { uploadReceipt } from '@/lib/upload'
 import { paymentCodeFor } from '@/lib/paymentCode'
@@ -56,6 +58,7 @@ export default function Payments() {
   const [aiMsg, setAiMsg] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [balances, setBalances] = useState<Record<string, number>>({})
 
   /** Αντιστοιχίζει διαμέρισμα από αιτιολογία (κωδικός) ή όνομα καταθέτη. */
   function matchApartment(reference?: string, payer?: string): string {
@@ -103,7 +106,12 @@ export default function Payments() {
 
   async function load() {
     if (!building) return
-    setPayments(await listPayments(building.id))
+    const [pays, statements] = await Promise.all([
+      listPayments(building.id),
+      listStatements(building.id),
+    ])
+    setPayments(pays)
+    setBalances(balancesByApartment(statements, pays))
   }
 
   useEffect(() => {
@@ -459,6 +467,7 @@ export default function Payments() {
           building={building}
           apartments={apartments}
           existing={payments}
+          balances={balances}
           onImported={load}
         />
       )}

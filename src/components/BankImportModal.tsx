@@ -7,19 +7,27 @@ import { money, latinize } from '@/lib/format'
 import type { Apartment, Building, Payment } from '@/types'
 import { analyzeBankStatement, type BankTxn } from '@/lib/ocr'
 import { createPayment } from '@/lib/repos/payments'
+import { createExpense } from '@/lib/repos/expenses'
 import { paymentCodeFor } from '@/lib/paymentCode'
 
 interface Row {
   date: string // YYYY-MM-DD
   description: string
   amount: number
-  apartmentId: string
+  apartmentId: string // για εισπράξεις (credit)
+  category: string // για χρεώσεις (debit) → δαπάνη
   include: boolean
   duplicate: boolean
 }
 
 function toISO(d?: string): string {
   return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : new Date().toISOString().slice(0, 10)
+}
+
+/** Αναγνωρίζει χρεώσεις προμήθειας/εξόδων τράπεζας. */
+function isFee(description: string): boolean {
+  const d = latinize(description)
+  return /\bcom\b|promith|proemith|eksoda|charge|\bfee\b|commission/.test(d)
 }
 
 export function BankImportModal({
@@ -94,9 +102,22 @@ export function BankImportModal({
         const amount = Number(t.amount) || 0
         const date = toISO(t.date)
         const description = t.description || ''
-        const apartmentId = amount > 0 ? matchApartment(description, amount) : ''
-        const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
-        return { date, description, amount, apartmentId, include: amount > 0 && !!apartmentId && !duplicate, duplicate }
+        if (amount > 0) {
+          const apartmentId = matchApartment(description, amount)
+          const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
+          return { date, description, amount, apartmentId, category: '', include: !!apartmentId && !duplicate, duplicate }
+        }
+        // Χρέωση: προμήθεια → δαπάνη «Τραπεζικά έξοδα» (προεπιλογή ενεργή).
+        const fee = isFee(description)
+        return {
+          date,
+          description,
+          amount,
+          apartmentId: '',
+          category: fee ? 'Τραπεζικά έξοδα' : description.slice(0, 60),
+          include: fee,
+          duplicate: false,
+        }
       })
       setRows(built)
       if (built.length === 0) setMsg('Δεν βρέθηκαν κινήσεις στο αρχείο.')
@@ -111,14 +132,16 @@ export function BankImportModal({
     setRows((prev) => (prev ? prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) : prev))
   }
 
-  const toImport = (rows ?? []).filter((r) => r.include && r.apartmentId && r.amount > 0)
+  const payRows = (rows ?? []).filter((r) => r.include && r.amount > 0 && r.apartmentId)
+  const expenseRows = (rows ?? []).filter((r) => r.include && r.amount < 0 && r.category.trim())
+  const totalToImport = payRows.length + expenseRows.length
 
   async function doImport() {
-    if (!building || toImport.length === 0) return
+    if (!building || totalToImport === 0) return
     setImporting(true)
     setError(null)
     try {
-      for (const r of toImport) {
+      for (const r of payRows) {
         await createPayment({
           buildingId: building.id,
           apartmentId: r.apartmentId,
@@ -128,7 +151,23 @@ export function BankImportModal({
           note: `Extré: ${r.description}`.slice(0, 200),
         })
       }
-      setMsg(`Εισήχθησαν ${toImport.length} πληρωμές.`)
+      for (const r of expenseRows) {
+        await createExpense({
+          buildingId: building.id,
+          period: r.date.slice(0, 7),
+          date: r.date,
+          group: 'koinoxrista',
+          category: r.category.trim(),
+          amount: Math.abs(r.amount),
+          method: 'millesime',
+          scaleKey: 'genika',
+          note: `Extré: ${r.description}`.slice(0, 200),
+        })
+      }
+      const parts: string[] = []
+      if (payRows.length) parts.push(`${payRows.length} πληρωμές`)
+      if (expenseRows.length) parts.push(`${expenseRows.length} δαπάνες`)
+      setMsg(`Εισήχθησαν ${parts.join(' & ')}.`)
       setRows(null)
       onImported()
     } catch (e) {
@@ -148,8 +187,8 @@ export function BankImportModal({
         <>
           <Button variant="secondary" onClick={onClose} disabled={importing}>Κλείσιμο</Button>
           {rows && (
-            <Button onClick={doImport} disabled={importing || toImport.length === 0}>
-              {importing ? 'Εισαγωγή…' : `Εισαγωγή (${toImport.length})`}
+            <Button onClick={doImport} disabled={importing || totalToImport === 0}>
+              {importing ? 'Εισαγωγή…' : `Εισαγωγή (${totalToImport})`}
             </Button>
           )}
         </>
@@ -180,7 +219,7 @@ export function BankImportModal({
         {rows && (
           <>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">{rows.length} κινήσεις — επιλεγμένες για εισαγωγή: <b>{toImport.length}</b></span>
+              <span className="text-gray-600">{rows.length} κινήσεις — επιλεγμένες για εισαγωγή: <b>{totalToImport}</b></span>
               <button onClick={() => setRows(null)} className="text-xs text-blue-600 hover:underline">Νέο αρχείο</button>
             </div>
             <div className="max-h-[22rem] overflow-y-auto rounded-md border border-gray-200">
@@ -198,11 +237,11 @@ export function BankImportModal({
                   {rows.map((r, i) => {
                     const credit = r.amount > 0
                     return (
-                      <tr key={i} className={`border-t border-gray-100 ${!credit ? 'bg-gray-50/60 text-gray-400' : ''}`}>
+                      <tr key={i} className={`border-t border-gray-100 ${!credit ? 'bg-amber-50/40' : ''}`}>
                         <td className="px-2 py-1">
                           <input
                             type="checkbox"
-                            disabled={!credit || !r.apartmentId}
+                            disabled={credit ? !r.apartmentId : !r.category.trim()}
                             checked={r.include}
                             onChange={(e) => update(i, { include: e.target.checked })}
                           />
@@ -212,7 +251,7 @@ export function BankImportModal({
                           <div className="max-w-[16rem] truncate" title={r.description}>{r.description}</div>
                           {r.duplicate && <Badge color="amber">πιθανό διπλό</Badge>}
                         </td>
-                        <td className={`px-2 py-1 text-right tnum font-medium ${credit ? 'text-green-700' : 'text-gray-400'}`}>
+                        <td className={`px-2 py-1 text-right tnum font-medium ${credit ? 'text-green-700' : 'text-red-700'}`}>
                           {money(r.amount)}
                         </td>
                         <td className="px-2 py-1">
@@ -234,7 +273,16 @@ export function BankImportModal({
                               })}
                             </select>
                           ) : (
-                            <span className="text-gray-400">χρέωση</span>
+                            <div className="flex items-center gap-1">
+                              <span className="shrink-0 text-amber-600" title="Χρέωση → δαπάνη κτιρίου">δαπάνη:</span>
+                              <input
+                                type="text"
+                                value={r.category}
+                                placeholder="Κατηγορία δαπάνης"
+                                onChange={(e) => update(i, { category: e.target.value, include: !!e.target.value.trim() })}
+                                className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
+                              />
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -244,7 +292,7 @@ export function BankImportModal({
               </table>
             </div>
             <p className="flex items-center gap-1.5 text-xs text-gray-400">
-              <FileText size={13} /> Οι εισπράξεις γίνονται πληρωμές με τρόπο «Τραπεζική κατάθεση». Οι χρεώσεις αγνοούνται.
+              <FileText size={13} /> Οι εισπράξεις γίνονται πληρωμές («Τραπεζική κατάθεση»). Οι χρεώσεις (π.χ. προμήθεια) γίνονται δαπάνες κτιρίου (γενικά, χιλιοστά).
             </p>
           </>
         )}

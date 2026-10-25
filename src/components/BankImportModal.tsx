@@ -28,6 +28,7 @@ export function BankImportModal({
   building,
   apartments,
   existing,
+  balances,
   onImported,
 }: {
   open: boolean
@@ -35,6 +36,7 @@ export function BankImportModal({
   building: Building
   apartments: Apartment[]
   existing: Payment[]
+  balances: Record<string, number>
   onImported: () => void
 }) {
   const [analyzing, setAnalyzing] = useState(false)
@@ -55,7 +57,7 @@ export function BankImportModal({
     [apartments, building.code],
   )
 
-  function matchApartment(description: string): string {
+  function matchApartment(description: string, amount: number): string {
     const d = latinize(description)
     // 1) Κωδικός αιτιολογίας πληρωμής
     for (const m of matchData) if (m.payCode && d.includes(m.payCode)) return m.id
@@ -65,6 +67,11 @@ export function BankImportModal({
     }
     // 3) Επώνυμο ιδιοκτήτη
     for (const m of matchData) if (m.tokens.some((t) => d.includes(t))) return m.id
+    // 4) Fallback: μοναδικό διαμέρισμα με οφειλή ίση με το ποσό
+    if (amount > 0) {
+      const hits = apartments.filter((a) => Math.abs((balances[a.id] ?? 0) - amount) < 0.01)
+      if (hits.length === 1) return hits[0].id
+    }
     return ''
   }
 
@@ -87,7 +94,7 @@ export function BankImportModal({
         const amount = Number(t.amount) || 0
         const date = toISO(t.date)
         const description = t.description || ''
-        const apartmentId = amount > 0 ? matchApartment(description) : ''
+        const apartmentId = amount > 0 ? matchApartment(description, amount) : ''
         const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
         return { date, description, amount, apartmentId, include: amount > 0 && !!apartmentId && !duplicate, duplicate }
       })
@@ -129,11 +136,6 @@ export function BankImportModal({
     } finally {
       setImporting(false)
     }
-  }
-
-  const aptLabel = (id: string) => {
-    const a = apartments.find((x) => x.id === id)
-    return a ? `${a.code}${a.ownerName ? ` — ${a.ownerName}` : ''}` : ''
   }
 
   return (
@@ -221,9 +223,15 @@ export function BankImportModal({
                               className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
                             >
                               <option value="">— (παράλειψη)</option>
-                              {apartments.map((a) => (
-                                <option key={a.id} value={a.id}>{aptLabel(a.id)}</option>
-                              ))}
+                              {apartments.map((a) => {
+                                const owed = balances[a.id] ?? 0
+                                const near = Math.abs(owed - r.amount) < 0.01
+                                return (
+                                  <option key={a.id} value={a.id}>
+                                    {a.code}{a.ownerName ? ` — ${a.ownerName}` : ''} · οφειλή {money(owed)}{near ? ' ✓' : ''}
+                                  </option>
+                                )
+                              })}
                             </select>
                           ) : (
                             <span className="text-gray-400">χρέωση</span>

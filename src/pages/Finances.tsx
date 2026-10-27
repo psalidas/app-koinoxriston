@@ -10,7 +10,7 @@ import type { Expense, Payment, Statement, FundEntry } from '@/types'
 import { listStatements } from '@/lib/repos/statements'
 import { listExpenses } from '@/lib/repos/expenses'
 import { listPayments } from '@/lib/repos/payments'
-import { listFundEntries, fundBalance } from '@/lib/repos/fund'
+import { listFundEntries, cashBalance, fundEntryTotals } from '@/lib/repos/fund'
 
 type ExpView = 'month' | 'quarter' | 'year' | 'range'
 
@@ -59,9 +59,10 @@ export default function Finances() {
 
   const aptCode = (id: string) => apartments.find((a) => a.id === id)?.code ?? '—'
 
-  const balance = fundBalance(fund)
-  const totalIn = fund.filter((e) => e.type === 'in').reduce((s, e) => s + e.amount, 0)
-  const totalOut = fund.filter((e) => e.type === 'out').reduce((s, e) => s + e.amount, 0)
+  const balance = cashBalance(payments, expenses, fund)
+  const feTotals = fundEntryTotals(fund)
+  const totalIn = payments.reduce((s, p) => s + (p.amount || 0), 0) + feTotals.inSum
+  const totalOut = expenses.reduce((s, e) => s + (e.amount || 0), 0) + feTotals.outSum
 
   const periodExpenses = useMemo(() => {
     return expenses.filter((e) => {

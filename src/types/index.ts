@@ -236,6 +236,12 @@ export interface FundEntry {
   amount: number
   category: string
   note?: string
+  /**
+   * Εσωτερική μεταφορά (π.χ. κατάθεση μετρητών ταμείου στην τράπεζα). Εμφανίζεται
+   * στο καθολικό αλλά ΔΕΝ μετρά στο υπόλοιπο, για να μη διπλομετρηθεί — τα
+   * μετρητά των ενοίκων καταχωρούνται ήδη ως πληρωμές.
+   */
+  transfer?: boolean
   createdAt?: Timestamp
   createdBy?: string
 }

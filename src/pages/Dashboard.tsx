@@ -7,7 +7,7 @@ import { Card, PageHeader, Button } from '@/components/forms'
 import { money, formatPeriod, currentPeriod } from '@/lib/format'
 import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
-import { listFundEntries, fundBalance } from '@/lib/repos/fund'
+import { listFundEntries, cashBalance } from '@/lib/repos/fund'
 import { listExpenses } from '@/lib/repos/expenses'
 import { listContracts, daysUntil } from '@/lib/repos/contracts'
 import { balancesByApartment } from '@/lib/balances'
@@ -31,13 +31,13 @@ export default function Dashboard() {
         listStatements(building.id),
         listPayments(building.id),
         listFundEntries(building.id),
-        listExpenses(building.id, currentPeriod()),
+        listExpenses(building.id),
         listContracts(building.id),
       ])
       const balances = balancesByApartment(statements, payments)
       setOwed(Object.values(balances).reduce((s, v) => s + (v > 0 ? v : 0), 0))
-      setFund(fundBalance(fundEntries))
-      setPeriodExpenses(expenses.reduce((s, e) => s + e.amount, 0))
+      setFund(cashBalance(payments, expenses, fundEntries))
+      setPeriodExpenses(expenses.filter((e) => e.period === currentPeriod()).reduce((s, e) => s + e.amount, 0))
       setExpiring(
         contracts.filter((c) => {
           const d = daysUntil(c)

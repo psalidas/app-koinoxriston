@@ -24,6 +24,7 @@ interface Row {
   amount: number
   apartmentId: string // είσπραξη (credit) → πληρωμή διαμερίσματος
   toFund: boolean // είσπραξη με «άλλη αιτιολογία» → κίνηση Ταμείου (in)
+  fundTransfer: boolean // κίνηση Ταμείου που είναι εσωτερική μεταφορά (δεν μετρά)
   category: string // debit → κατηγορία δαπάνης· credit+toFund → αιτιολογία Ταμείου
   feeMode: FeeMode // μόνο για χρεώσεις
   deductFromId: number | null // χρέωση σε mode 'deduct': σε ποια είσπραξη αφαιρείται
@@ -47,6 +48,12 @@ function isFee(description: string): boolean {
  */
 function refTokens(description: string): string[] {
   return latinize(description).match(/[a-z0-9]{8,}/g) ?? []
+}
+
+/** Κατάθεση μετρητών ταμείου στην τράπεζα → εσωτερική μεταφορά (δεν μετρά). */
+function isCashTransfer(description: string): boolean {
+  const d = latinize(description)
+  return /katathes/.test(d) && /(metr|tamei)/.test(d)
 }
 
 export function BankImportModal({
@@ -139,6 +146,7 @@ export function BankImportModal({
           const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
           return {
             id: idx, date, description, amount, apartmentId, toFund: false,
+            fundTransfer: isCashTransfer(description),
             category: '', feeMode: 'expense', deductFromId: null,
             include: !!apartmentId && !duplicate, duplicate,
           }
@@ -146,6 +154,7 @@ export function BankImportModal({
         const fee = isFee(description)
         return {
           id: idx, date, description, amount, apartmentId: '', toFund: false,
+          fundTransfer: false,
           category: fee ? 'Τραπεζικά έξοδα' : description.slice(0, 60),
           feeMode: 'expense', deductFromId: null,
           include: fee, duplicate: false,
@@ -240,6 +249,7 @@ export function BankImportModal({
           amount: r.amount,
           category: r.category.trim(),
           note: `Extré: ${r.description}`.slice(0, 200),
+          transfer: r.fundTransfer || undefined,
         })
       }
       for (const r of expenseRows) {
@@ -383,13 +393,24 @@ export function BankImportModal({
                                 <option value="fund">Άλλη αιτιολογία (κίνηση Ταμείου)</option>
                               </select>
                               {r.toFund && (
-                                <input
-                                  type="text"
-                                  value={r.category}
-                                  placeholder="Αιτιολογία (π.χ. ΚΑΤΑΘΕΣΗ ΤΑΜΕΙΟΥ ΜΕΤΡΗΤΩΝ)"
-                                  onChange={(e) => update(i, { category: e.target.value, include: !!e.target.value.trim() })}
-                                  className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
-                                />
+                                <>
+                                  <input
+                                    type="text"
+                                    value={r.category}
+                                    placeholder="Αιτιολογία (π.χ. ΚΑΤΑΘΕΣΗ ΤΑΜΕΙΟΥ ΜΕΤΡΗΤΩΝ)"
+                                    onChange={(e) => update(i, { category: e.target.value, include: !!e.target.value.trim() })}
+                                    className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
+                                  />
+                                  <label className="flex items-start gap-1 text-[11px] text-gray-500">
+                                    <input
+                                      type="checkbox"
+                                      className="mt-0.5"
+                                      checked={r.fundTransfer}
+                                      onChange={(e) => update(i, { fundTransfer: e.target.checked })}
+                                    />
+                                    <span>Εσωτερική μεταφορά (δεν μετρά στο υπόλοιπο)</span>
+                                  </label>
+                                </>
                               )}
                             </div>
                           ) : (

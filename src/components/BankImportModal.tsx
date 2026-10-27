@@ -39,6 +39,14 @@ function isFee(description: string): boolean {
   return /\bcom\b|promith|proemith|eksoda|charge|\bfee\b|commission/.test(d)
 }
 
+/**
+ * Κωδικοί αναφοράς μέσα σε μια περιγραφή (αλφαριθμητικά ≥8 χαρακτήρων, π.χ.
+ * «20261012096777B082»). Μια προμήθεια κι η μεταφορά της μοιράζονται τον ίδιο.
+ */
+function refTokens(description: string): string[] {
+  return latinize(description).match(/[a-z0-9]{8,}/g) ?? []
+}
+
 export function BankImportModal({
   open,
   onClose,
@@ -119,42 +127,43 @@ export function BankImportModal({
     setRows(null)
     try {
       const txns = await analyzeBankStatement(file)
-      const built: Row[] = []
-      let lastMatchedCreditId: number | null = null
-      txns.forEach((t: BankTxn, idx: number) => {
+      // 1ο πέρασμα: χτίσε τις γραμμές (εισπράξεις + χρεώσεις ως έξοδα).
+      const built: Row[] = txns.map((t: BankTxn, idx: number): Row => {
         const amount = Number(t.amount) || 0
         const date = toISO(t.date)
         const description = t.description || ''
         if (amount > 0) {
           const apartmentId = matchApartment(description, amount)
           const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
-          if (apartmentId) lastMatchedCreditId = idx
-          built.push({
+          return {
             id: idx, date, description, amount, apartmentId,
             category: '', feeMode: 'expense', deductFromId: null,
             include: !!apartmentId && !duplicate, duplicate,
-          })
-          return
+          }
         }
-        // Χρέωση. Προμήθεια αμέσως μετά από αντιστοιχισμένη είσπραξη →
-        // αφαιρείται από εκείνη την πληρωμή (ο καταθέτης οφείλει την προμήθεια).
         const fee = isFee(description)
-        if (fee && lastMatchedCreditId != null) {
-          built.push({
-            id: idx, date, description, amount, apartmentId: '',
-            category: '', feeMode: 'deduct', deductFromId: lastMatchedCreditId,
-            include: true, duplicate: false,
-          })
-          return
-        }
-        // Λοιπή τραπεζική χρέωση → γενικό έξοδο.
-        built.push({
+        return {
           id: idx, date, description, amount, apartmentId: '',
           category: fee ? 'Τραπεζικά έξοδα' : description.slice(0, 60),
           feeMode: 'expense', deductFromId: null,
           include: fee, duplicate: false,
-        })
+        }
       })
+      // 2ο πέρασμα: σύνδεσε κάθε προμήθεια με τη μεταφορά της. Προτεραιότητα
+      // στον κοινό κωδικό αναφοράς· εναλλακτικά σε κατάθεση της ίδιας ημ/νίας.
+      const credits = built.filter((r) => r.amount > 0)
+      const creditTok = new Map<number, Set<string>>(credits.map((c) => [c.id, new Set(refTokens(c.description))]))
+      for (const r of built) {
+        if (r.amount >= 0 || !isFee(r.description)) continue
+        const ftoks = refTokens(r.description)
+        let target = credits.find((c) => ftoks.some((t) => creditTok.get(c.id)!.has(t)))
+        if (!target) target = credits.find((c) => c.apartmentId && c.date === r.date)
+        if (target) {
+          r.feeMode = 'deduct'
+          r.deductFromId = target.id
+          r.include = true
+        }
+      }
       setRows(built)
       if (built.length === 0) setMsg('Δεν βρέθηκαν κινήσεις στο αρχείο.')
     } catch (e) {
@@ -170,8 +179,8 @@ export function BankImportModal({
 
   const rr = rows ?? []
 
-  // Υποψήφιες εισπράξεις για αφαίρεση προμήθειας (αντιστοιχισμένες σε διαμ.).
-  const creditTargets = rr.filter((r) => r.amount > 0 && r.apartmentId)
+  // Υποψήφιες εισπράξεις για αφαίρεση προμήθειας.
+  const creditTargets = rr.filter((r) => r.amount > 0)
   const includedCreditIds = useMemo(
     () => new Set(rr.filter((r) => r.amount > 0 && r.include && r.apartmentId).map((r) => r.id)),
     [rows],
@@ -366,7 +375,7 @@ export function BankImportModal({
                                 <option value="expense">Γενικό έξοδο (δαπάνη κτιρίου)</option>
                                 {creditTargets.map((c) => (
                                   <option key={c.id} value={`d:${c.id}`}>
-                                    Αφαίρεση από: {aptLabel(c.apartmentId)} · {money(c.amount)}
+                                    Αφαίρεση από: {c.apartmentId ? aptLabel(c.apartmentId) : 'μη αντιστοιχισμένη κατάθεση'} · {money(c.amount)} · {c.date}
                                   </option>
                                 ))}
                               </select>

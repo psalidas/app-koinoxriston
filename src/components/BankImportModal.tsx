@@ -8,6 +8,7 @@ import type { Apartment, Building, Payment } from '@/types'
 import { analyzeBankStatement, type BankTxn } from '@/lib/ocr'
 import { createPayment } from '@/lib/repos/payments'
 import { createExpense } from '@/lib/repos/expenses'
+import { createFundEntry } from '@/lib/repos/fund'
 import { paymentCodeFor } from '@/lib/paymentCode'
 
 // Τρόπος χειρισμού μιας χρέωσης (debit):
@@ -21,8 +22,9 @@ interface Row {
   date: string // YYYY-MM-DD
   description: string
   amount: number
-  apartmentId: string // για εισπράξεις (credit)
-  category: string // για χρεώσεις-έξοδα (debit → δαπάνη)
+  apartmentId: string // είσπραξη (credit) → πληρωμή διαμερίσματος
+  toFund: boolean // είσπραξη με «άλλη αιτιολογία» → κίνηση Ταμείου (in)
+  category: string // debit → κατηγορία δαπάνης· credit+toFund → αιτιολογία Ταμείου
   feeMode: FeeMode // μόνο για χρεώσεις
   deductFromId: number | null // χρέωση σε mode 'deduct': σε ποια είσπραξη αφαιρείται
   include: boolean
@@ -136,14 +138,14 @@ export function BankImportModal({
           const apartmentId = matchApartment(description, amount)
           const duplicate = apartmentId ? isDuplicate(apartmentId, amount, date) : false
           return {
-            id: idx, date, description, amount, apartmentId,
+            id: idx, date, description, amount, apartmentId, toFund: false,
             category: '', feeMode: 'expense', deductFromId: null,
             include: !!apartmentId && !duplicate, duplicate,
           }
         }
         const fee = isFee(description)
         return {
-          id: idx, date, description, amount, apartmentId: '',
+          id: idx, date, description, amount, apartmentId: '', toFund: false,
           category: fee ? 'Τραπεζικά έξοδα' : description.slice(0, 60),
           feeMode: 'expense', deductFromId: null,
           include: fee, duplicate: false,
@@ -199,16 +201,17 @@ export function BankImportModal({
   }, [rows, includedCreditIds])
 
   const payRows = rr
-    .filter((r) => r.amount > 0 && r.include && r.apartmentId)
+    .filter((r) => r.amount > 0 && r.include && r.apartmentId && !r.toFund)
     .map((r) => {
       const fee = feeByCredit[r.id] ?? 0
       return { row: r, fee, net: Math.max(0, Math.round((r.amount - fee) * 100) / 100) }
     })
+  const fundRows = rr.filter((r) => r.amount > 0 && r.include && r.toFund && r.category.trim())
   const expenseRows = rr.filter((r) => r.amount < 0 && r.include && r.feeMode === 'expense' && r.category.trim())
   const appliedDeducts = rr.filter(
     (r) => r.amount < 0 && r.include && r.feeMode === 'deduct' && r.deductFromId != null && includedCreditIds.has(r.deductFromId),
   ).length
-  const totalToImport = payRows.length + expenseRows.length
+  const totalToImport = payRows.length + fundRows.length + expenseRows.length
 
   async function doImport() {
     if (!building || totalToImport === 0) return
@@ -229,6 +232,16 @@ export function BankImportModal({
           note,
         })
       }
+      for (const r of fundRows) {
+        await createFundEntry({
+          buildingId: building.id,
+          date: Timestamp.fromDate(new Date(r.date)),
+          type: 'in',
+          amount: r.amount,
+          category: r.category.trim(),
+          note: `Extré: ${r.description}`.slice(0, 200),
+        })
+      }
       for (const r of expenseRows) {
         await createExpense({
           buildingId: building.id,
@@ -245,6 +258,7 @@ export function BankImportModal({
       const parts: string[] = []
       if (payRows.length) parts.push(`${payRows.length} πληρωμές`)
       if (appliedDeducts) parts.push(`${appliedDeducts} προμήθειες αφαιρέθηκαν`)
+      if (fundRows.length) parts.push(`${fundRows.length} κινήσεις Ταμείου`)
       if (expenseRows.length) parts.push(`${expenseRows.length} δαπάνες`)
       setMsg(`Εισήχθησαν: ${parts.join(' · ')}.`)
       setRows(null)
@@ -342,22 +356,42 @@ export function BankImportModal({
                         </td>
                         <td className="px-2 py-1">
                           {credit ? (
-                            <select
-                              value={r.apartmentId}
-                              onChange={(e) => update(i, { apartmentId: e.target.value, include: !!e.target.value })}
-                              className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
-                            >
-                              <option value="">— (παράλειψη)</option>
-                              {apartments.map((a) => {
-                                const owed = balances[a.id] ?? 0
-                                const near = Math.abs(owed - r.amount) < 0.01
-                                return (
-                                  <option key={a.id} value={a.id}>
-                                    {a.code}{a.ownerName ? ` — ${a.ownerName}` : ''} · οφειλή {money(owed)}{near ? ' ✓' : ''}
-                                  </option>
-                                )
-                              })}
-                            </select>
+                            <div className="space-y-1">
+                              <select
+                                value={r.toFund ? 'fund' : r.apartmentId}
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                  if (v === 'fund') {
+                                    const reason = (r.category || r.description).trim()
+                                    update(i, { toFund: true, apartmentId: '', category: reason, include: !!reason })
+                                  } else {
+                                    update(i, { toFund: false, apartmentId: v, include: !!v })
+                                  }
+                                }}
+                                className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
+                              >
+                                <option value="">— (παράλειψη)</option>
+                                {apartments.map((a) => {
+                                  const owed = balances[a.id] ?? 0
+                                  const near = Math.abs(owed - r.amount) < 0.01
+                                  return (
+                                    <option key={a.id} value={a.id}>
+                                      {a.code}{a.ownerName ? ` — ${a.ownerName}` : ''} · οφειλή {money(owed)}{near ? ' ✓' : ''}
+                                    </option>
+                                  )
+                                })}
+                                <option value="fund">Άλλη αιτιολογία (κίνηση Ταμείου)</option>
+                              </select>
+                              {r.toFund && (
+                                <input
+                                  type="text"
+                                  value={r.category}
+                                  placeholder="Αιτιολογία (π.χ. ΚΑΤΑΘΕΣΗ ΤΑΜΕΙΟΥ ΜΕΤΡΗΤΩΝ)"
+                                  onChange={(e) => update(i, { category: e.target.value, include: !!e.target.value.trim() })}
+                                  className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
+                                />
+                              )}
+                            </div>
                           ) : (
                             <div className="space-y-1">
                               <select
@@ -400,9 +434,10 @@ export function BankImportModal({
             <p className="flex items-start gap-1.5 text-xs text-gray-400">
               <FileText size={13} className="mt-0.5 shrink-0" />
               <span>
-                Οι εισπράξεις γίνονται πληρωμές («Τραπεζική κατάθεση»). Η προμήθεια μεταφοράς αφαιρείται από την πληρωμή του
-                καταθέτη, ώστε να οφείλει το πλήρες ποσό των κοινοχρήστων. Λοιπές τραπεζικές χρεώσεις καταχωρούνται ως γενικά
-                έξοδα κτιρίου.
+                Οι εισπράξεις γίνονται πληρωμές («Τραπεζική κατάθεση»)· όσες δεν αφορούν διαμέρισμα (π.χ. κατάθεση ταμείου
+                μετρητών) μπορούν να καταχωρηθούν ως κίνηση Ταμείου με δική τους αιτιολογία. Η προμήθεια μεταφοράς αφαιρείται
+                από την πληρωμή του καταθέτη, ώστε να οφείλει το πλήρες ποσό των κοινοχρήστων. Λοιπές τραπεζικές χρεώσεις
+                καταχωρούνται ως γενικά έξοδα κτιρίου.
               </span>
             </p>
           </>

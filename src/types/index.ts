@@ -317,6 +317,17 @@ export interface Announcement {
   createdAt?: Timestamp
 }
 
+/** Σχόλιο/πρόσθετο σημείο κάτω από μια ανακοίνωση (από διαχειριστή ή μέλος). */
+export interface AnnouncementComment {
+  id: string
+  buildingId: string
+  announcementId: string
+  body: string
+  authorName: string
+  createdBy?: string
+  createdAt?: Timestamp
+}
+
 // ── Tickets (βλάβες / αιτήματα) ────────────────────────────────────────────────
 
 export type TicketStatus = 'open' | 'in_progress' | 'done'

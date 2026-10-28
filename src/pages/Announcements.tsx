@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, Pin, Paperclip, X, Upload } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Pencil, Trash2, Pin, Paperclip, X, Upload, MessageSquarePlus, Send } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Button, Card, PageHeader, Field, TextField } from '@/components/forms'
 import { Modal } from '@/components/Modal'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { formatDate } from '@/lib/format'
-import type { Announcement, AnnouncementAttachment } from '@/types'
+import { formatDate, formatDateTime } from '@/lib/format'
+import type { Announcement, AnnouncementAttachment, AnnouncementComment } from '@/types'
 import {
   listAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
 } from '@/lib/repos/announcements'
+import {
+  listAnnouncementComments,
+  createAnnouncementComment,
+  deleteAnnouncementComment,
+} from '@/lib/repos/announcementComments'
 import { uploadDocument } from '@/lib/upload'
 import { logAudit } from '@/lib/audit'
 
@@ -22,8 +27,9 @@ function isImage(a: AnnouncementAttachment): boolean {
 
 export default function Announcements() {
   const { building } = useAppData()
-  const { isManager, user, profile } = useAuth()
+  const { isManager, user, profile, authIdentifier } = useAuth()
   const [items, setItems] = useState<Announcement[]>([])
+  const [comments, setComments] = useState<AnnouncementComment[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [form, setForm] = useState({ title: '', body: '', pinned: false })
@@ -31,11 +37,56 @@ export default function Announcements() {
   const [newFiles, setNewFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [toDelete, setToDelete] = useState<Announcement | null>(null)
+  // Σύνθεση σχολίου ανά ανακοίνωση
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [posting, setPosting] = useState<string | null>(null)
+  const [commentToDelete, setCommentToDelete] = useState<AnnouncementComment | null>(null)
+
+  const commentsByAnn = useMemo(() => {
+    const m: Record<string, AnnouncementComment[]> = {}
+    for (const c of comments) (m[c.announcementId] ??= []).push(c)
+    return m
+  }, [comments])
 
   async function load() {
     if (!building) return
-    setItems(await listAnnouncements(building.id))
+    const [anns, cmts] = await Promise.all([
+      listAnnouncements(building.id),
+      listAnnouncementComments(building.id),
+    ])
+    setItems(anns)
+    setComments(cmts)
   }
+
+  async function postComment(a: Announcement) {
+    if (!building) return
+    const body = (draft[a.id] ?? '').trim()
+    if (!body) return
+    setPosting(a.id)
+    try {
+      await createAnnouncementComment({
+        buildingId: building.id,
+        announcementId: a.id,
+        body,
+        authorName: profile?.name ?? user?.email ?? 'Μέλος',
+        createdBy: authIdentifier ?? user?.email ?? undefined,
+      })
+      setDraft((d) => ({ ...d, [a.id]: '' }))
+      await load()
+    } finally {
+      setPosting(null)
+    }
+  }
+
+  async function confirmDeleteComment() {
+    if (!commentToDelete) return
+    await deleteAnnouncementComment(commentToDelete.id)
+    setCommentToDelete(null)
+    await load()
+  }
+
+  const canDeleteComment = (c: AnnouncementComment) =>
+    isManager || (!!authIdentifier && c.createdBy === authIdentifier) || (!!user?.email && c.createdBy === user.email)
 
   useEffect(() => {
     void load()
@@ -173,6 +224,54 @@ export default function Announcements() {
               <div className="mt-2 text-xs text-gray-400">
                 {a.authorName} · {formatDate(a.createdAt)}
               </div>
+
+              {/* Σχόλια / πρόσθετα σημεία */}
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                {(commentsByAnn[a.id]?.length ?? 0) > 0 && (
+                  <ul className="space-y-2">
+                    {commentsByAnn[a.id].map((c) => (
+                      <li key={c.id} className="rounded-md bg-gray-50 px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="whitespace-pre-wrap text-sm text-gray-700">{c.body}</p>
+                          {canDeleteComment(c) && (
+                            <button
+                              onClick={() => setCommentToDelete(c)}
+                              className="shrink-0 rounded p-0.5 text-gray-300 hover:bg-gray-100 hover:text-red-600"
+                              title="Διαγραφή σχολίου"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1 text-[11px] text-gray-400">
+                          {c.authorName} · {formatDateTime(c.createdAt)}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="mt-2 flex items-start gap-2">
+                  <MessageSquarePlus size={16} className="mt-2 shrink-0 text-gray-400" />
+                  <textarea
+                    rows={1}
+                    value={draft[a.id] ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void postComment(a)
+                    }}
+                    placeholder="Προσθήκη σχολίου ή πρόσθετου σημείου…"
+                    className="min-h-[2.25rem] w-full resize-y rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <Button
+                    onClick={() => void postComment(a)}
+                    disabled={posting === a.id || !(draft[a.id] ?? '').trim()}
+                    className="shrink-0"
+                  >
+                    <Send size={15} /> {posting === a.id ? '…' : 'Σχόλιο'}
+                  </Button>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
@@ -273,6 +372,13 @@ export default function Announcements() {
           onConfirm={confirmDelete}
         />
       )}
+
+      <ConfirmDialog
+        open={!!commentToDelete}
+        message="Διαγραφή σχολίου;"
+        onCancel={() => setCommentToDelete(null)}
+        onConfirm={confirmDeleteComment}
+      />
     </div>
   )
 }

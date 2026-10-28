@@ -177,6 +177,15 @@ service cloud.firestore {
       allow create: if canManage(request.resource.data.buildingId);
       allow update, delete: if canManage(resource.data.buildingId);
     }
+    // Σχόλια ανακοινώσεων: κάθε μέλος του κτιρίου μπορεί να σχολιάσει· διαγραφή
+    // από διαχειριστή ή από τον συντάκτη του σχολίου.
+    match /announcementComments/{id} {
+      allow read: if canRead(resource.data.buildingId);
+      allow create: if canRead(request.resource.data.buildingId);
+      allow update: if false;
+      allow delete: if canManage(resource.data.buildingId)
+        || (isAuthed() && resource.data.get('createdBy', '') == uid());
+    }
     match /contracts/{id} {
       allow read: if canRead(resource.data.buildingId);
       allow create: if canManage(request.resource.data.buildingId);

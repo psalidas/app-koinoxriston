@@ -39,6 +39,7 @@ export default function Announcements() {
   const [toDelete, setToDelete] = useState<Announcement | null>(null)
   // Σύνθεση σχολίου ανά ανακοίνωση
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const [draftFiles, setDraftFiles] = useState<Record<string, File[]>>({})
   const [posting, setPosting] = useState<string | null>(null)
   const [commentToDelete, setCommentToDelete] = useState<AnnouncementComment | null>(null)
 
@@ -61,17 +62,25 @@ export default function Announcements() {
   async function postComment(a: Announcement) {
     if (!building) return
     const body = (draft[a.id] ?? '').trim()
-    if (!body) return
+    const files = draftFiles[a.id] ?? []
+    if (!body && files.length === 0) return
     setPosting(a.id)
     try {
+      const uploaded: AnnouncementAttachment[] = []
+      for (const f of files) {
+        const up = await uploadDocument(f, building.id)
+        uploaded.push({ url: up.url, name: up.name, path: up.path, contentType: f.type || '' })
+      }
       await createAnnouncementComment({
         buildingId: building.id,
         announcementId: a.id,
         body,
+        attachments: uploaded.length ? uploaded : undefined,
         authorName: profile?.name ?? user?.email ?? 'Μέλος',
         createdBy: authIdentifier ?? user?.email ?? undefined,
       })
       setDraft((d) => ({ ...d, [a.id]: '' }))
+      setDraftFiles((d) => ({ ...d, [a.id]: [] }))
       await load()
     } finally {
       setPosting(null)
@@ -243,6 +252,24 @@ export default function Announcements() {
                             </button>
                           )}
                         </div>
+                        {c.attachments && c.attachments.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {c.attachments.map((f, i) =>
+                              isImage(f) ? (
+                                <a key={i} href={f.url} target="_blank" rel="noreferrer" title={f.name}>
+                                  <img src={f.url} alt={f.name}
+                                    className="h-16 w-16 rounded-md border border-gray-200 object-cover hover:opacity-90" />
+                                </a>
+                              ) : (
+                                <a key={i} href={f.url} target="_blank" rel="noreferrer"
+                                  className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 hover:border-blue-300 hover:text-blue-700">
+                                  <Paperclip size={13} className="shrink-0" />
+                                  <span className="truncate">{f.name}</span>
+                                </a>
+                              ),
+                            )}
+                          </div>
+                        )}
                         <div className="mt-1 text-[11px] text-gray-400">
                           {c.authorName} · {formatDateTime(c.createdAt)}
                         </div>
@@ -253,19 +280,52 @@ export default function Announcements() {
 
                 <div className="mt-2 flex items-start gap-2">
                   <MessageSquarePlus size={16} className="mt-2 shrink-0 text-gray-400" />
-                  <textarea
-                    rows={1}
-                    value={draft[a.id] ?? ''}
-                    onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void postComment(a)
-                    }}
-                    placeholder="Προσθήκη σχολίου ή πρόσθετου σημείου…"
-                    className="min-h-[2.25rem] w-full resize-y rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+                  <div className="flex-1 space-y-2">
+                    <textarea
+                      rows={1}
+                      value={draft[a.id] ?? ''}
+                      onChange={(e) => setDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void postComment(a)
+                      }}
+                      placeholder="Προσθήκη σχολίου ή πρόσθετου σημείου…"
+                      className="min-h-[2.25rem] w-full resize-y rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    {(draftFiles[a.id]?.length ?? 0) > 0 && (
+                      <ul className="space-y-1">
+                        {draftFiles[a.id].map((f, i) => (
+                          <li key={i} className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 px-2 py-1 text-xs">
+                            <Upload size={13} className="shrink-0 text-blue-400" />
+                            <span className="min-w-0 flex-1 truncate text-gray-700">{f.name}</span>
+                            <button
+                              onClick={() => setDraftFiles((d) => ({ ...d, [a.id]: d[a.id].filter((_, idx) => idx !== i) }))}
+                              className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
+                              title="Αφαίρεση"
+                            >
+                              <X size={13} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const fs = Array.from(e.target.files ?? [])
+                          if (fs.length) setDraftFiles((d) => ({ ...d, [a.id]: [...(d[a.id] ?? []), ...fs] }))
+                          e.target.value = ''
+                        }}
+                      />
+                      <Paperclip size={13} /> Επισύναψη αρχείου
+                    </label>
+                  </div>
                   <Button
                     onClick={() => void postComment(a)}
-                    disabled={posting === a.id || !(draft[a.id] ?? '').trim()}
+                    disabled={posting === a.id || (!(draft[a.id] ?? '').trim() && (draftFiles[a.id]?.length ?? 0) === 0)}
                     className="shrink-0"
                   >
                     <Send size={15} /> {posting === a.id ? '…' : 'Σχόλιο'}

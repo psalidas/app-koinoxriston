@@ -323,6 +323,7 @@ export interface AnnouncementComment {
   buildingId: string
   announcementId: string
   body: string
+  attachments?: AnnouncementAttachment[]
   authorName: string
   createdBy?: string
   createdAt?: Timestamp

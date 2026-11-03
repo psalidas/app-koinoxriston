@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, Megaphone, ChevronRight, Receipt } from 'lucide-react'
+import { Home, Megaphone, ChevronRight, Receipt, Paperclip } from 'lucide-react'
 import { useAppData } from '@/lib/appData'
 import { useAuth } from '@/lib/auth'
 import { Card, PageHeader, Badge } from '@/components/forms'
 import { money, formatPeriod, formatDate } from '@/lib/format'
-import type { Announcement, Payment, Statement } from '@/types'
+import type { Announcement, AnnouncementAttachment, Payment, Statement } from '@/types'
 import { listStatements } from '@/lib/repos/statements'
 import { listPayments } from '@/lib/repos/payments'
 import { listAnnouncements } from '@/lib/repos/announcements'
 import { ledgerFor, type LedgerRow } from '@/lib/balances'
+
+function isImageAtt(a: AnnouncementAttachment): boolean {
+  return (a.contentType ?? '').startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(a.name)
+}
 
 interface AptView {
   id: string
@@ -178,6 +182,24 @@ export default function Portal() {
                   {a.pinned && <Badge color="amber">Καρφιτσωμένο</Badge>}
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-gray-600">{a.body}</p>
+                {a.attachments && a.attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {a.attachments.map((f, i) =>
+                      isImageAtt(f) ? (
+                        <a key={i} href={f.url} target="_blank" rel="noreferrer" title={f.name}>
+                          <img src={f.url} alt={f.name}
+                            className="h-16 w-16 rounded-md border border-gray-200 object-cover hover:opacity-90" />
+                        </a>
+                      ) : (
+                        <a key={i} href={f.url} target="_blank" rel="noreferrer"
+                          className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700 hover:border-blue-300 hover:text-blue-700">
+                          <Paperclip size={13} className="shrink-0" />
+                          <span className="truncate">{f.name}</span>
+                        </a>
+                      ),
+                    )}
+                  </div>
+                )}
                 <div className="mt-2 text-xs text-gray-400">
                   {a.authorName} · {formatDate(a.createdAt)}
                 </div>

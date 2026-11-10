@@ -195,6 +195,8 @@ export interface Expense {
   receiptName?: string
   receiptPath?: string
   note?: string
+  /** Σταθερό κλειδί κίνησης extré — για αποφυγή διπλοεισαγωγής. */
+  importKey?: string
   createdAt?: Timestamp
   createdBy?: string
 }
@@ -220,6 +222,8 @@ export interface Payment {
   date: Timestamp
   method: PaymentMethod
   note?: string
+  /** Σταθερό κλειδί κίνησης extré (ημ/νία|ποσό|περιγραφή) — για αποφυγή διπλοεισαγωγής. */
+  importKey?: string
   /** Συνημμένο αρχείο πληρωμής (απόδειξη/εντολή). */
   receiptUrl?: string
   receiptName?: string
@@ -242,6 +246,8 @@ export interface FundEntry {
    * μετρητά των ενοίκων καταχωρούνται ήδη ως πληρωμές.
    */
   transfer?: boolean
+  /** Σταθερό κλειδί κίνησης extré — για αποφυγή διπλοεισαγωγής. */
+  importKey?: string
   createdAt?: Timestamp
   createdBy?: string
 }

@@ -239,6 +239,22 @@ export function BankImportModal({
           if (!r.alreadyImported) r.include = true
         }
       }
+      // 3ο πέρασμα: αφαίρεσε την προμήθεια από την προεπιλεγμένη (μονή) γραμμή
+      // επιμερισμού, ώστε η πληρωμή να καταχωρηθεί καθαρή (ο καταθέτης οφείλει
+      // την προμήθεια). Αν ο χρήστης έχει ήδη επιμερίσει, δεν την πειράζουμε.
+      const feeByCreditInit: Record<number, number> = {}
+      for (const r of built) {
+        if (r.amount < 0 && r.include && r.feeMode === 'deduct' && r.deductFromId != null) {
+          feeByCreditInit[r.deductFromId] = (feeByCreditInit[r.deductFromId] ?? 0) + Math.abs(r.amount)
+        }
+      }
+      for (const r of built) {
+        if (r.amount <= 0 || r.allocations.length !== 1) continue
+        const fee = feeByCreditInit[r.id] ?? 0
+        if (fee > 0 && Math.abs(r.allocations[0].amount - r.amount) < 0.001) {
+          r.allocations[0].amount = Math.max(0, Math.round((r.amount - fee) * 100) / 100)
+        }
+      }
       setRows(built)
       if (built.length === 0) setMsg('Δεν βρέθηκαν κινήσεις στο αρχείο.')
     } catch (e) {

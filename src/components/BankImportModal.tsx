@@ -160,14 +160,13 @@ export function BankImportModal({
     try {
       // Κλειδιά ήδη εισαγμένων κινήσεων (πληρωμές + δαπάνες + κινήσεις Ταμείου).
       const [exps, funds] = await Promise.all([listExpenses(building.id), listFundEntries(building.id)])
-      const exactKeys = new Set<string>()
-      const looseKeys = new Set<string>()
+      const exactKeys = new Set<string>() // importKey (κινήσεις από extré)
+      const looseKeys = new Set<string>() // ημ/νία|περιγραφή (από σημείωση «Extré:»)
       const addRecord = (importKey: string | undefined, note: string | undefined, dISO: string) => {
         if (importKey) {
           exactKeys.add(importKey)
           return
         }
-        // Παλιές εγγραφές (χωρίς importKey): χαλαρό κλειδί από τη σημείωση.
         const desc = descFromNote(note)
         if (dISO && desc) looseKeys.add(keyLoose(dISO, desc))
       }
@@ -175,8 +174,13 @@ export function BankImportModal({
       for (const e of exps) addRecord((e as Expense).importKey, e.note, e.date ?? `${e.period}-01`)
       for (const f of funds) addRecord((f as FundEntry).importKey, f.note, isoOf(f.date))
 
-      const seen = (dateISO: string, amount: number, description: string) =>
-        exactKeys.has(keyExact(dateISO, amount, description)) || looseKeys.has(keyLoose(dateISO, description))
+      // Χειροκίνητες εγγραφές (χωρίς «Extré:»): αντιστοίχιση κατά ποσό.
+      //  • πληρωμές: ημ/νία|ποσό|διαμέρισμα  •  δαπάνες: ποσό|ημ/νία & ποσό|μήνα  •  ταμείο: ημ/νία|ποσό
+      const amt = (n: number) => (Math.round((n || 0) * 100) / 100).toFixed(2)
+      const payByKey = new Set(existing.map((p) => `${isoOf(p.date)}|${amt(p.amount)}|${p.apartmentId}`))
+      const fundByKey = new Set(funds.map((f) => `${isoOf(f.date)}|${amt(f.amount)}`))
+      const expByDate = new Set(exps.map((e) => `${e.date ?? `${e.period}-01`}|${amt(e.amount)}`))
+      const expByPeriod = new Set(exps.map((e) => `${e.period}|${amt(e.amount)}`))
 
       const txns = await analyzeBankStatement(file)
       // 1ο πέρασμα: χτίσε τις γραμμές.
@@ -184,7 +188,7 @@ export function BankImportModal({
         const amount = Number(t.amount) || 0
         const date = toISO(t.date)
         const description = t.description || ''
-        const already = seen(date, amount, description)
+        const base = exactKeys.has(keyExact(date, amount, description)) || looseKeys.has(keyLoose(date, description))
         if (amount > 0) {
           const hits = matchApartmentsAll(description)
           const one = hits.length ? hits[0] : matchApartment(description, amount)
@@ -195,6 +199,10 @@ export function BankImportModal({
               : one
               ? [{ apartmentId: one, amount }]
               : []
+          const already =
+            base ||
+            (!!one && payByKey.has(`${date}|${amt(amount)}|${one}`)) ||
+            fundByKey.has(`${date}|${amt(amount)}`)
           return {
             id: idx, date, description, amount, allocations,
             toFund: false, fundTransfer: isCashTransfer(description),
@@ -203,6 +211,12 @@ export function BankImportModal({
           }
         }
         const fee = isFee(description)
+        const abs = amt(Math.abs(amount))
+        const already =
+          base ||
+          expByDate.has(`${date}|${abs}`) ||
+          expByPeriod.has(`${date.slice(0, 7)}|${abs}`) ||
+          fundByKey.has(`${date}|${abs}`)
         return {
           id: idx, date, description, amount, allocations: [],
           toFund: false, fundTransfer: false,
@@ -436,7 +450,7 @@ export function BankImportModal({
                         <td className="whitespace-nowrap px-2 py-1 align-top">{r.date}</td>
                         <td className="px-2 py-1 align-top">
                           <div className="max-w-[15rem] truncate" title={r.description}>{r.description}</div>
-                          {r.alreadyImported && <Badge color="gray">ήδη εισαγμένο</Badge>}
+                          {r.alreadyImported && <Badge color="gray">ήδη καταχωρημένο</Badge>}
                           {credit && fee > 0 && (
                             <div className="text-[11px] text-amber-700">καθαρό: <b>{money(net)}</b> (−προμήθεια {money(fee)})</div>
                           )}
@@ -566,8 +580,9 @@ export function BankImportModal({
               <FileText size={13} className="mt-0.5 shrink-0" />
               <span>
                 Μια είσπραξη μπορεί να επιμεριστεί σε <b>πολλά διαμερίσματα</b> (προσθήκη γραμμών). Για ένα διαμέρισμα σε
-                πολλούς μήνες, μία πληρωμή καλύπτει τις παλαιότερες οφειλές. Κινήσεις που έχουν ήδη εισαχθεί σημειώνονται
-                «ήδη εισαγμένο» και παραλείπονται. Λοιπές τραπεζικές χρεώσεις → γενικά έξοδα κτιρίου.
+                πολλούς μήνες, μία πληρωμή καλύπτει τις παλαιότερες οφειλές. Κινήσεις που έχουν ήδη καταχωρηθεί (από extré ή
+                <b> χειροκίνητα</b> — ίδιο ποσό/ημ/νία/διαμέρισμα, ή ποσό/μήνας για δαπάνες) σημειώνονται «ήδη καταχωρημένο» και
+                παραλείπονται. Λοιπές τραπεζικές χρεώσεις → γενικά έξοδα κτιρίου.
               </span>
             </p>
           </>

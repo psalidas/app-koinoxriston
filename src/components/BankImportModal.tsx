@@ -7,7 +7,7 @@ import { money, latinize } from '@/lib/format'
 import type { Apartment, Building, Expense, FundEntry, Payment } from '@/types'
 import { analyzeBankStatement, type BankTxn } from '@/lib/ocr'
 import { createPayment } from '@/lib/repos/payments'
-import { createExpense, listExpenses } from '@/lib/repos/expenses'
+import { createExpense, updateExpense, listExpenses } from '@/lib/repos/expenses'
 import { createFundEntry, listFundEntries } from '@/lib/repos/fund'
 import { paymentCodeFor } from '@/lib/paymentCode'
 
@@ -34,6 +34,7 @@ interface Row {
   category: string // debit → κατηγορία δαπάνης· credit+toFund → αιτιολογία Ταμείου
   feeMode: FeeMode // μόνο για χρεώσεις
   deductFromId: number | null // χρέωση σε mode 'deduct': σε ποια είσπραξη αφαιρείται
+  linkExpenseId: string // χρέωση → σύνδεση με ΥΠΑΡΧΟΥΣΑ δαπάνη (αντί νέας)
   include: boolean
   alreadyImported: boolean // ταιριάζει με ήδη εισαγμένη κίνηση → εκτός by default
 }
@@ -102,6 +103,7 @@ export function BankImportModal({
   const [analyzing, setAnalyzing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [rows, setRows] = useState<Row[] | null>(null)
+  const [expenses, setExpenses] = useState<Expense[]>([])
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -174,6 +176,8 @@ export function BankImportModal({
       for (const e of exps) addRecord((e as Expense).importKey, e.note, e.date ?? `${e.period}-01`)
       for (const f of funds) addRecord((f as FundEntry).importKey, f.note, isoOf(f.date))
 
+      setExpenses(exps)
+
       // Χειροκίνητες εγγραφές (χωρίς «Extré:»): αντιστοίχιση κατά ποσό.
       //  • πληρωμές: ημ/νία|ποσό|διαμέρισμα  •  δαπάνες: ποσό|ημ/νία & ποσό|μήνα  •  ταμείο: ημ/νία|ποσό
       const amt = (n: number) => (Math.round((n || 0) * 100) / 100).toFixed(2)
@@ -181,6 +185,16 @@ export function BankImportModal({
       const fundByKey = new Set(funds.map((f) => `${isoOf(f.date)}|${amt(f.amount)}`))
       const expByDate = new Set(exps.map((e) => `${e.date ?? `${e.period}-01`}|${amt(e.amount)}`))
       const expByPeriod = new Set(exps.map((e) => `${e.period}|${amt(e.amount)}`))
+
+      // Πρόταση σύνδεσης χρέωσης με ΥΠΑΡΧΟΥΣΑ δαπάνη (ίδιο ποσό, κοντινή ημ/νία)
+      // που δεν έχει ήδη συνδεθεί με extré.
+      const findExpenseMatch = (dateISO: string, absAmount: number): string => {
+        const cands = exps.filter((e) => !e.importKey && Math.abs((e.amount || 0) - absAmount) < 0.01)
+        if (!cands.length) return ''
+        const month = dateISO.slice(0, 7)
+        const pool = cands.filter((e) => e.period === month)
+        return (pool.length ? pool : cands)[0].id
+      }
 
       const txns = await analyzeBankStatement(file)
       // 1ο πέρασμα: χτίσε τις γραμμές.
@@ -206,22 +220,25 @@ export function BankImportModal({
           return {
             id: idx, date, description, amount, allocations,
             toFund: false, fundTransfer: isCashTransfer(description),
-            category: '', feeMode: 'expense', deductFromId: null,
+            category: '', feeMode: 'expense', deductFromId: null, linkExpenseId: '',
             include: allocations.length > 0 && !already, alreadyImported: already,
           }
         }
         const fee = isFee(description)
-        const abs = amt(Math.abs(amount))
+        const absNum = Math.abs(amount)
+        const abs = amt(absNum)
         const already =
           base ||
           expByDate.has(`${date}|${abs}`) ||
           expByPeriod.has(`${date.slice(0, 7)}|${abs}`) ||
           fundByKey.has(`${date}|${abs}`)
+        // Πρόταση σύνδεσης με υπάρχουσα δαπάνη (όταν δεν είναι προμήθεια/ήδη).
+        const linkExpenseId = !fee && !already ? findExpenseMatch(date, absNum) : ''
         return {
           id: idx, date, description, amount, allocations: [],
           toFund: false, fundTransfer: false,
           category: fee ? 'Τραπεζικά έξοδα' : description.slice(0, 60),
-          feeMode: 'expense', deductFromId: null,
+          feeMode: 'expense', deductFromId: null, linkExpenseId,
           include: fee && !already, alreadyImported: already,
         }
       })
@@ -317,11 +334,12 @@ export function BankImportModal({
   const payCredits = rr.filter(creditIsPay)
   const payCount = payCredits.reduce((s, r) => s + r.allocations.filter((a) => a.apartmentId && a.amount > 0).length, 0)
   const fundRows = rr.filter((r) => r.amount > 0 && r.include && r.toFund && r.category.trim())
-  const expenseRows = rr.filter((r) => r.amount < 0 && r.include && r.feeMode === 'expense' && r.category.trim())
+  const linkRows = rr.filter((r) => r.amount < 0 && r.include && r.linkExpenseId)
+  const expenseRows = rr.filter((r) => r.amount < 0 && r.include && !r.linkExpenseId && r.feeMode === 'expense' && r.category.trim())
   const appliedDeducts = rr.filter(
     (r) => r.amount < 0 && r.include && r.feeMode === 'deduct' && r.deductFromId != null && includedCreditIds.has(r.deductFromId),
   ).length
-  const totalToImport = payCount + fundRows.length + expenseRows.length
+  const totalToImport = payCount + fundRows.length + expenseRows.length + linkRows.length
 
   async function doImport() {
     if (!building || totalToImport === 0) return
@@ -371,11 +389,17 @@ export function BankImportModal({
           importKey: keyExact(r.date, r.amount, r.description),
         })
       }
+      // Σύνδεση με υπάρχουσες δαπάνες: σφραγίζουμε το importKey ώστε να μην
+      // ξαναπροταθεί η ίδια κίνηση (δεν δημιουργείται νέα δαπάνη).
+      for (const r of linkRows) {
+        await updateExpense(r.linkExpenseId, { importKey: keyExact(r.date, r.amount, r.description) })
+      }
       const parts: string[] = []
       if (payCount) parts.push(`${payCount} πληρωμές`)
       if (appliedDeducts) parts.push(`${appliedDeducts} προμήθειες αφαιρέθηκαν`)
       if (fundRows.length) parts.push(`${fundRows.length} κινήσεις Ταμείου`)
       if (expenseRows.length) parts.push(`${expenseRows.length} δαπάνες`)
+      if (linkRows.length) parts.push(`${linkRows.length} συνδέσεις δαπανών`)
       setMsg(`Εισήχθησαν: ${parts.join(' · ')}.`)
       setRows(null)
       onImported()
@@ -457,7 +481,7 @@ export function BankImportModal({
                             disabled={
                               credit
                                 ? r.toFund ? !r.category.trim() : !r.allocations.some((a) => a.apartmentId && a.amount > 0)
-                                : r.feeMode === 'deduct' ? r.deductFromId == null : !r.category.trim()
+                                : r.feeMode === 'deduct' ? r.deductFromId == null : r.linkExpenseId ? false : !r.category.trim()
                             }
                             checked={r.include}
                             onChange={(e) => update(i, { include: e.target.checked })}
@@ -559,22 +583,36 @@ export function BankImportModal({
                           ) : (
                             <div className="space-y-1">
                               <select
-                                value={r.feeMode === 'deduct' && r.deductFromId != null ? `d:${r.deductFromId}` : 'expense'}
+                                value={
+                                  r.feeMode === 'deduct' && r.deductFromId != null ? `d:${r.deductFromId}`
+                                    : r.linkExpenseId ? `x:${r.linkExpenseId}`
+                                    : 'expense'
+                                }
                                 onChange={(e) => {
                                   const v = e.target.value
-                                  if (v === 'expense') update(i, { feeMode: 'expense', deductFromId: null, include: !!r.category.trim() })
-                                  else update(i, { feeMode: 'deduct', deductFromId: Number(v.slice(2)), include: true })
+                                  if (v === 'expense') update(i, { feeMode: 'expense', deductFromId: null, linkExpenseId: '', include: !!r.category.trim() })
+                                  else if (v.startsWith('d:')) update(i, { feeMode: 'deduct', deductFromId: Number(v.slice(2)), linkExpenseId: '', include: true })
+                                  else update(i, { feeMode: 'expense', deductFromId: null, linkExpenseId: v.slice(2), include: true })
                                 }}
                                 className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
                               >
-                                <option value="expense">Γενικό έξοδο (δαπάνη κτιρίου)</option>
+                                <option value="expense">Γενικό έξοδο (νέα δαπάνη)</option>
                                 {creditTargets.map((c) => (
                                   <option key={c.id} value={`d:${c.id}`}>
                                     Αφαίρεση από: {c.allocations[0]?.apartmentId ? aptLabel(c.allocations[0].apartmentId) : 'κατάθεση'} · {money(c.amount)} · {c.date}
                                   </option>
                                 ))}
+                                {expenses.length > 0 && (
+                                  <optgroup label="Σύνδεση με υπάρχουσα δαπάνη">
+                                    {expenses.map((ex) => (
+                                      <option key={ex.id} value={`x:${ex.id}`}>
+                                        {ex.category} · {money(ex.amount)} · {ex.period}{ex.importKey ? ' ✓' : ''}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
                               </select>
-                              {r.feeMode === 'expense' && (
+                              {!r.linkExpenseId && r.feeMode === 'expense' && (
                                 <input
                                   type="text"
                                   value={r.category}
@@ -582,6 +620,9 @@ export function BankImportModal({
                                   onChange={(e) => update(i, { category: e.target.value, include: !!e.target.value.trim() })}
                                   className="w-full rounded border border-gray-300 px-1 py-0.5 text-xs"
                                 />
+                              )}
+                              {r.linkExpenseId && (
+                                <div className="text-[11px] text-blue-600">↳ σύνδεση με υπάρχουσα δαπάνη (δεν δημιουργείται νέα)</div>
                               )}
                             </div>
                           )}
@@ -596,9 +637,9 @@ export function BankImportModal({
               <FileText size={13} className="mt-0.5 shrink-0" />
               <span>
                 Μια είσπραξη μπορεί να επιμεριστεί σε <b>πολλά διαμερίσματα</b> (προσθήκη γραμμών). Για ένα διαμέρισμα σε
-                πολλούς μήνες, μία πληρωμή καλύπτει τις παλαιότερες οφειλές. Κινήσεις που έχουν ήδη καταχωρηθεί (από extré ή
-                <b> χειροκίνητα</b> — ίδιο ποσό/ημ/νία/διαμέρισμα, ή ποσό/μήνας για δαπάνες) σημειώνονται «ήδη καταχωρημένο» και
-                παραλείπονται. Λοιπές τραπεζικές χρεώσεις → γενικά έξοδα κτιρίου.
+                πολλούς μήνες, μία πληρωμή καλύπτει τις παλαιότερες οφειλές. Μια χρέωση που αντιστοιχεί σε δαπάνη που έχεις
+                ήδη περάσει μπορεί να <b>συνδεθεί με την υπάρχουσα δαπάνη</b> (δεν δημιουργείται νέα)· προτείνεται αυτόματα όταν
+                βρεθεί ίδιο ποσό. Κινήσεις ήδη καταχωρημένες σημειώνονται «ήδη καταχωρημένο» και παραλείπονται.
               </span>
             </p>
           </>

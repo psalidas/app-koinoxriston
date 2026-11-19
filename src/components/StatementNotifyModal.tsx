@@ -163,6 +163,8 @@ export function StatementNotifyModal({
     name: r.user.name || '',
     apts: r.codes.join(', '),
     ref: r.refs.join(', '),
+    prev: money(r.rows.reduce((s, x) => s + (x.previousBalance || 0), 0)),
+    current: money(r.rows.reduce((s, x) => s + (x.currentCharge || 0), 0)),
     amount: money(r.totalDue),
   })
 
@@ -410,9 +412,10 @@ export function StatementNotifyModal({
           )}
 
           <p className="text-xs text-gray-400">
-            Μεταβλητές: <code>{'{name}'}</code> <code>{'{apts}'}</code> <code>{'{amount}'}</code> <code>{'{ref}'}</code>{' '}
-            <code>{'{period}'}</code> <code>{'{due}'}</code> <code>{'{iban}'}</code> <code>{'{bank}'}</code>{' '}
-            <code>{'{company}'}</code> <code>{'{building}'}</code> <code>{'{link}'}</code>. Τα προεπιλεγμένα κείμενα ορίζονται στις «Ρυθμίσεις κτιρίου».
+            Μεταβλητές: <code>{'{name}'}</code> <code>{'{apts}'}</code> <code>{'{prev}'}</code> <code>{'{current}'}</code>{' '}
+            <code>{'{amount}'}</code> <code>{'{ref}'}</code> <code>{'{period}'}</code> <code>{'{due}'}</code>{' '}
+            <code>{'{iban}'}</code> <code>{'{bank}'}</code> <code>{'{company}'}</code> <code>{'{building}'}</code> <code>{'{link}'}</code>.
+            {' '}<code>{'{prev}'}</code> = προηγούμενες περίοδοι, <code>{'{current}'}</code> = τρέχουσα. Τα προεπιλεγμένα κείμενα ορίζονται στις «Ρυθμίσεις κτιρίου».
           </p>
         </div>
       )}
